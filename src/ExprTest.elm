@@ -247,7 +247,7 @@ test_list1 = Array.fromList [
    ,( " 1 + 3 + (6 /  2) "  ,  OFloat 7          )
    ,( " 1 - 3 + (6 /  2) "  ,  OFloat 1          )
    ,( " 1 - 5 + (6 /  2) "  ,  OFloat -1         )
-   ,( " -1 + 5           "  ,  OFloat -1         )
+   ,( " -1 + 5           "  ,  OFloat -4         )
    ,( " (-1) + 5           "  ,  OFloat -1       )
    ,( " \"abc\" + \"ABC\" " ,  OString "abcABC"  )
    ,( " False             " ,  OBool False       )

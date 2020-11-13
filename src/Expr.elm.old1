@@ -1220,22 +1220,13 @@ stringValue =
                 succeed (AvString (arg |> Maybe.withDefault ""))
             )
 
-negateInt : Parser Int
-negateInt =
-  oneOf
-    [ succeed negate
-        |. symbol "-"
-        |= int
-    , int
-    ]
 
 intValue : Parser ArgValue
 intValue =
     --succeed (::)
     succeed Just
         |. spaces
-        --|= int
-        |= negateInt
+        |= int
         |. spaces
         |> andThen
             (\arg ->
