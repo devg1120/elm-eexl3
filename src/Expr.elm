@@ -49,7 +49,10 @@ type Expr
     | Variable String
       --| Function String (Array.Array ArgValue)
     | Function String (List Expr)
-    | ArrayIndex String Int
+    --| ArrayIndex String Int
+    | ArrayIndex String Expr
+    --| ArraySlice String Expr Expr
+    | ArraySlice String (Expr, Expr)
     | DictLookUp String String
     | DictIndex String String
     | Add Expr Expr --[+]  String Float
@@ -425,10 +428,18 @@ evaluate userenv userfunc context expr =
                     --ExprNotFoundFunc  (name,args)
                     ExprOk (userfunc userenv context name args_)
 
-        ArrayIndex name index ->
+        --ArrayIndex name index ->
+        ArrayIndex name index_expr ->
             let
                 array_ =
                     getConstant name context
+                index_ =
+                    evaluate userenv userfunc context index_expr
+                index = case index_ of
+                      ExprOk (OFloat aa) ->
+                               floor aa
+                      _ ->
+                               -1
 
                 ans =
                     case array_ of
@@ -454,6 +465,52 @@ evaluate userenv userfunc context expr =
             in
             ExprOk ans
 
+        --ArraySlice name index1_expr index2_expr ->
+        ArraySlice name pair_expr  ->
+            let
+                index1_expr = Tuple.first pair_expr
+                index2_expr = Tuple.second pair_expr
+                array_ =
+                    getConstant name context
+                index1_ =
+                    evaluate userenv userfunc context index1_expr
+                index1 = case index1_ of
+                      ExprOk (OFloat aa) ->
+                               floor aa
+                      _ ->
+                               -1
+                index2_ =
+                    evaluate userenv userfunc context index2_expr
+                index2 = case index2_ of
+                      ExprOk (OFloat aa) ->
+                               floor aa
+                      _ ->
+                               -1
+
+                ans =
+                    case array_ of
+                        Just a ->
+                            case a of
+                                OArray a_ ->
+                                    let
+                                        a2 =
+                                            Array.slice index1 index2 a_
+                                    in
+                                    OArray a2
+                                    --case a2 of
+                                    --    Just a2_ ->
+                                    --        OArray a2_
+
+                                    --    _ ->
+                                    --        OString " !!not_found arrayIndex"
+
+                                _ ->
+                                    OString " !!not_found arrayIndex"
+
+                        _ ->
+                            OString " !!not_found ArrayIndex"
+            in
+            ExprOk ans
         --(OString " !!array_index")
         DictLookUp name key ->
             let
@@ -1304,14 +1361,6 @@ func =
 array_index : Parser Expr
 array_index =
     succeed Tuple.pair
-        --|= backtrackable
-        --    (variable
-        --        { start = Char.isLower
-        --        , inner = Char.isAlphaNum
-        --        , reserved = Set.empty
-        --        }
-        --    )
-        --|. backtrackable (symbol "[")
         |= variable
             { start = Char.isLower
 
@@ -1321,13 +1370,44 @@ array_index =
             , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
             }
         |. symbol "["
-        |= int
+        --|= int
+        |= expression3
         |. symbol "]"
         |> andThen
             (\( name, index ) ->
                 succeed (ArrayIndex name index)
             )
 
+slice : Parser (Expr,Expr)
+slice =
+    succeed Tuple.pair
+        |= expression3
+        |. symbol ":"
+        |= expression3
+        |> andThen
+            (\(index1,index2)  ->
+                succeed  (Tuple.pair index1 index2)
+            )
+
+array_slice : Parser Expr
+array_slice =
+    succeed Tuple.pair
+        |= variable
+            { start = Char.isLower
+
+            --, inner = Char.isAlphaNum
+            --, reserved = Set.empty
+            , inner = \c -> Char.isAlphaNum c || c == '_'
+            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
+            }
+        |. symbol "["
+        --|= int
+        |= slice
+        |> andThen
+            (\(name,index_pair)  ->
+                --succeed (ArrayIndex name index)
+                succeed (ArraySlice name index_pair)
+            )
 
 dict_lookup : Parser Expr
 dict_lookup =
@@ -1461,6 +1541,7 @@ term =
             , backtrackable array
             , backtrackable dict
             , backtrackable func
+            , backtrackable array_slice
             , backtrackable array_index
             , backtrackable dict_lookup
             , backtrackable dict_index
@@ -1546,6 +1627,57 @@ expressionHelp2 revOps expr =
             |> andThen (\( op, newExpr ) -> expressionHelp2 (( expr, op ) :: revOps) newExpr)
         , lazy (\_ -> succeed (finalize revOps expr))
         ]
+
+
+-----------------------------------------------------------
+
+
+term3 : Parser Expr
+term3 =
+    succeed (\a -> a)
+        |. spaces
+        |= oneOf
+            --[ digits
+            [ backtrackable string
+            , backtrackable array
+            , backtrackable dict
+
+            --, backtrackable func
+            --, backtrackable array_index
+            , backtrackable dict_lookup
+            , backtrackable dict_index
+            , backtrackable default
+            , backtrackable typevar
+            , backtrackable digits
+            , bool
+            , succeed identity
+                |. symbol "("
+                |. spaces
+                |= lazy (\_ -> expression2)
+                |. spaces
+                |. symbol ")"
+            ]
+        |. spaces
+
+
+expression3 : Parser Expr
+expression3 =
+    term3
+        |> andThen (expressionHelp3 [])
+
+
+expressionHelp3 : List ( Expr, Operator ) -> Expr -> Parser Expr
+expressionHelp3 revOps expr =
+    oneOf
+        [ succeed Tuple.pair
+            |. spaces
+            |= operator
+            |. spaces
+            |= term2
+            |> andThen (\( op, newExpr ) -> expressionHelp3 (( expr, op ) :: revOps) newExpr)
+        , lazy (\_ -> succeed (finalize revOps expr))
+        ]
+
 
 
 

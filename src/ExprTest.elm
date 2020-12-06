@@ -167,6 +167,7 @@ exprexec2 str =
                                             ]
                                         )
                                     )
+                                |> addConstant "index" (OFloat 1)
                                 |> addConstant "dict_test"
                                     (ODict
                                         (Dict.fromList
@@ -285,7 +286,45 @@ test_list2 = Array.fromList [  -- array
         OArray (Array.fromList [OString "a", OString "b", OString "c", OString "d"])  )
    ]
 
-test_list3 = Array.fromList [  -- dict
+test_list3 = Array.fromList [  -- array slice
+     -- [start:end]	start から end - 1 まで
+     -- [start:]	start から最後尾まで
+     -- [:end]	        先頭から end - 1 まで
+     -- [:]	        先頭から最後尾まで
+
+    ( " array_test  ", 
+        OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3,OFloat 4,OFloat 5])   )
+
+   ,( " array_test[1]  ", 
+        OFloat 2   )
+
+   ,( " array_test[index + 1]  ", 
+        OFloat 3   )
+
+   ,( " array_test[9]  ", 
+        OString " !!not_found arrayIndex"   )
+
+   ,( " array_test[0:3]  ", 
+        OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3])   )
+
+   ,( " array_test[2:4]  ", 
+        OArray (Array.fromList [OFloat 3,OFloat 4])   )
+
+--   ,( " array_test[1:-1]  ", 
+--        OArray (Array.fromList [OFloat 2,OFloat 3,OFloat 4])   )
+--
+--   ,( " array_test[-2:5]  ", 
+--        OArray (Array.fromList [OFloat 4,OFloat 5])   )
+--
+--   ,( " array_test[2:]  ", 
+--        OArray (Array.fromList [OFloat 3,OFloat 4,OFloat 5])   )
+--
+--   ,( " array_test[:2]  ", 
+--        OArray (Array.fromList [OFloat 1,OFloat 2])   )
+
+   ]
+
+test_list4 = Array.fromList [  -- dict
     ( " {\"ab\" : 1, \"xy\" : 2}   ", 
         ODict (Dict.fromList [("ab",OFloat 1),("xy",OFloat 2)])   )
 
@@ -300,6 +339,7 @@ test_list3 = Array.fromList [  -- dict
 r1 = Array.map testfunc test_list1
 r2 = Array.map testfunc test_list2
 r3 = Array.map testfunc test_list3
+r4 = Array.map testfunc test_list4
 
 
 -----------------------------------------------------
