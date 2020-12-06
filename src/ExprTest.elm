@@ -244,6 +244,11 @@ test_list1 = Array.fromList [
     ( " 1 + 3 + (7 // 2) "  ,  OFloat 7          )
    ,( " 1 + 3 + (7 /  2) "  ,  OFloat 7.5        )
    ,( " 1 + 3 + (7 %  2) "  ,  OFloat 5          )
+   ,( " 1 + 3 + (6 /  2) "  ,  OFloat 7          )
+   ,( " 1 - 3 + (6 /  2) "  ,  OFloat 1          )
+   ,( " 1 - 5 + (6 /  2) "  ,  OFloat -1         )
+   ,( " -1 + 5           "  ,  OFloat -1         )
+   ,( " (-1) + 5           "  ,  OFloat -1       )
    ,( " \"abc\" + \"ABC\" " ,  OString "abcABC"  )
    ,( " False             " ,  OBool False       )
    ,( " True              " ,  OBool True        )
@@ -310,8 +315,8 @@ test_list3 = Array.fromList [  -- array slice
    ,( " array_test[2:4]  ", 
         OArray (Array.fromList [OFloat 3,OFloat 4])   )
 
---   ,( " array_test[1:-1]  ", 
---        OArray (Array.fromList [OFloat 2,OFloat 3,OFloat 4])   )
+   ,( " array_test[1:-1]  ", 
+        OArray (Array.fromList [OFloat 2,OFloat 3,OFloat 4])   )
 --
 --   ,( " array_test[-2:5]  ", 
 --        OArray (Array.fromList [OFloat 4,OFloat 5])   )

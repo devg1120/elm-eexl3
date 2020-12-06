@@ -472,6 +472,7 @@ evaluate userenv userfunc context expr =
                 index2_expr = Tuple.second pair_expr
                 array_ =
                     getConstant name context
+
                 index1_ =
                     evaluate userenv userfunc context index1_expr
                 index1 = case index1_ of
@@ -483,7 +484,7 @@ evaluate userenv userfunc context expr =
                     evaluate userenv userfunc context index2_expr
                 index2 = case index2_ of
                       ExprOk (OFloat aa) ->
-                               floor aa
+                              floor aa
                       _ ->
                                -1
 
@@ -493,8 +494,18 @@ evaluate userenv userfunc context expr =
                             case a of
                                 OArray a_ ->
                                     let
+                                        i1 = if index1 >= 0 then
+                                               index1 
+                                              else
+                                               (Array.length a_) + index1
+
+                                        i2 = if index2 >= 0 then
+                                               index2
+                                              else
+                                               (Array.length a_) + index2 
                                         a2 =
-                                            Array.slice index1 index2 a_
+                                            --Array.slice index1 index2 a_
+                                            Array.slice i1 i2 a_
                                     in
                                     OArray a2
                                     --case a2 of
