@@ -1,0 +1,219 @@
+module ExprTest exposing (..)
+
+import Expr exposing (..)
+
+
+---------------------------------------------------------------------
+{--
+
+test_strjoin : Context -> Input -> OutVal
+test_strjoin context ar =
+    let
+        a_ =
+            case Array.get 0 ar of
+                Just (AvString a) ->
+                    a
+
+                Just (AvVar a) ->
+                    let
+                        value =
+                            getConstant a context
+
+                        ans_ =
+                            case value of
+                                Just v ->
+                                    v
+
+                                _ ->
+                                    OString " AvVar not_found"
+
+                        result =
+                            case ans_ of
+                                OString v ->
+                                    v
+
+                                _ ->
+                                    " AvVar not_found"
+                    in
+                    result
+
+                _ ->
+                    ""
+
+        b_ =
+            case Array.get 1 ar of
+                Just (AvString a) ->
+                    a
+
+                Just (AvVar a) ->
+                    let
+                        value =
+                            getConstant a context
+
+                        ans_ =
+                            case value of
+                                Just v ->
+                                    v
+
+                                _ ->
+                                    OString " AvVar not_found"
+
+                        result =
+                            case ans_ of
+                                OString v ->
+                                    v
+
+                                _ ->
+                                    " AvVar not_found"
+                    in
+                    result
+
+                _ ->
+                    ""
+
+        ans =
+            a_ ++ b_
+    in
+    OString ans
+
+
+exprexec : String -> String
+exprexec str =
+    let
+        ast =
+            parse str
+
+        result =
+            case ast of
+                Err err ->
+                    Debug.toString err
+
+                Ok expr ->
+                    let
+                        context =
+                            empty
+                                |> addConstant "test1" (OString "OKOK")
+                                |> addConstant "test_flort" (OFloat 10.1)
+                                |> addConstant "array_test"
+                                    (OArray
+                                        (Array.fromList
+                                            [ OFloat 1
+                                            , OFloat 2
+                                            , OFloat 3
+                                            , OFloat 4
+                                            , OFloat 5
+                                            ]
+                                        )
+                                    )
+                                |> addConstant "dict_test"
+                                    (ODict
+                                        (Dict.fromList
+                                            [ ( "a", OFloat 1 )
+                                            , ( "b", OFloat 2 )
+                                            , ( "c", OFloat 3 )
+                                            , ( "d", OFloat 4 )
+                                            , ( "e", OFloat 5 )
+                                            ]
+                                        )
+                                    )
+                                |> addFunction "strjoin" test_strjoin
+
+                        userenv =
+                            { userFunctions = Dict.empty
+                            , userEnv = Dict.empty
+                            }
+
+                        userfunc : userenv -> Context -> String -> Array.Array ArgValue -> OutVal
+                        userfunc userenv_ context_ funcname input_args =
+                            OString "OK"
+
+                        ans =
+                            evaluate userenv userfunc context expr
+                    in
+                    Debug.toString ans
+    in
+    result
+
+--}
+
+r = exprexec " 1 + 3 + (7 //2) "
+
+{--
+> import Expr exposing (..)
+> exprexec " 1 + 3 + (7 //2) "
+"OFloat 7" : String
+> exprexec " 1 + 3 + (7 /2) "
+"OFloat 7.5" : String
+> exprexec " 1 + 3 + (7 %2) "
+"OFloat 5" : String
+> exprexec " \"abc\" + \"ABC\" "
+"OString \"abcABC\"" : String
+> exprexec " False "
+"OBool False" : String
+> exprexec " True "
+"OBool True" : String
+> exprexec " True && True"
+"OBool True" : String
+> exprexec " True && False"
+"OBool False" : String
+> exprexec " True || True"
+"OBool True" : String
+> exprexec " True || False"
+"OBool True" : String
+> exprexec " \"abc\" + test1 "
+"OString \"abcOKOK\"" : String
+
+> exprexec " 1.1  + test_flort "
+"OFloat 11.2" : String
+> exprexec " \"abc\" + strjoin( \"ABC\", \"XYZ\") "
+"OString \"abcABCXYZ\"" : Strin
+> exprexec " \"abc\" + strjoin( \"ABC\", test1) "
+"OString \"abcABCOKOK\"" : String
+
+> exprexec "1.0 <= 100.1"
+"OBool True" : String
+> exprexec "1.0 < 100.1"
+"OBool True" : String
+> exprexec "1.0 > 100.1"
+"OBool False" : String
+> exprexec "1.0 >= 100.1"
+"OBool False" : String
+> exprexec "1.0 <= 100.1"
+"OBool True" : String
+> exprexec "1.0 == 100.1"
+"OBool False" : String
+> exprexec "1.0 != 100.1"
+"OBool True" : String
+> exprexec "1.1 == 1.1"
+"OBool True" : String
+
+> exprexec "e"
+"OString \"not_found\"" : String
+
+                                --array
+> exprexec " [ 1,2,3,4,5] "
+"OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3])" : String
+
+> exprexec " [ \"1\",\"2\",\"3\",\"4\",\"5\"] "
+
+                                --dict
+> exprexec "{\"ab\" : 1, \"xy\" : 2}"
+"ODict (Dict.fromList [(\"ab\",OFloat 1),(\"xy\",OFloat 2)])" : String
+
+
+> exprexec " array_test " 
+"OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3,OFloat 4,OFloat 5])"
+    : String
+> exprexec " dict_test " 
+"ODict (Dict.fromList [(\"a\",OFloat 1),(\"b\",OFloat 2),(\"c\",OFloat 3),(\"d\",OFloat 4),(\"e\",OFloat 5)])"
+
+> exprexec "array_test[0]"
+"OFloat 1" : String
+
+> exprexec "dict_test.c"
+"OFloat 3" : String
+
+> exprexec "dict_test{\"c\"}"
+"OFloat 3" : String
+
+--}

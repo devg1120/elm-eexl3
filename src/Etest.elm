@@ -1,64 +1,86 @@
 module Etest exposing (..)
 
-import Exec exposing(..)
-import Expr exposing(..)
-import Stdlib exposing(..)
-
 --import Parser exposing (..)
 
 import Array
+import Exec exposing (..)
+import Expr exposing (..)
+import Stdlib exposing (..)
+
 
 
 --exec3 script_name =
+
+
 test script_name =
-  let
-     --ast = run script script_name
-     ast = stmt_parse script_name
-     result = case ast of
-          Err err ->
-              Debug.toString err
-          Ok  stmts ->
-              let
-                 context = empty
-                             |> addFunction "strjoin" strjoin 
-                 --context = init_context
+    let
+        --ast = run script script_name
+        ast =
+            stmt_parse script_name
 
-                 userenv = userenvEmpty
-                 (userenv_2,ans) = eval userenv context stmts
+        result =
+            case ast of
+                Err err ->
+                    Debug.toString err
 
-                 ans2 = case ans of
-                            Context a -> 
-                                     a
+                Ok stmts ->
+                    let
+                        context =
+                            empty
+                                |> addFunction "strjoin" strjoin
 
-                 env = Debug.toString  userenv_2
+                        --context = init_context
+                        userenv =
+                            userenvEmpty
 
-                 ans3 =  ans2.constants 
-                 log =  ans2.log
-                 --ans4 = Debug.toString  (Dict.toList ans3)
-                 --           |> String.replace "\"" ""
-                 --           |> String.replace "OFloat" ""
-                 --           |> String.replace "[" ""
-                 --           |> String.replace "]" ""
-                 --           |> String.replace "),(" ") ("
-                 
-                 --ans4 = Debug.toString  (ans3)
-                 ans4 = Debug.toString  (ans2)
-                            |> String.replace "\"" ""
-                            |> String.replace "OFloat" ""
-                            |> String.replace "[" ""
-                            |> String.replace "]" ""
-                            |> String.replace "," " ="
-                            |> String.replace ") =(" " , "
-                            --|> String.replace "(" ""
-                            --|> String.replace ")" ""
-                            --|> String.replace "Stack Dict.fromList " ""
-              in
-              ans4 ++ " -> " ++ log ++ "[" ++ env
-  in
-  result
+                        ( userenv_2, ans ) =
+                            eval userenv context stmts
+
+                        ans2 =
+                            case ans of
+                                Context a ->
+                                    a
+
+                        env =
+                            Debug.toString userenv_2
+
+                        ans3 =
+                            ans2.constants
+
+                        log =
+                            ans2.log
+
+                        --ans4 = Debug.toString  (Dict.toList ans3)
+                        --           |> String.replace "\"" ""
+                        --           |> String.replace "OFloat" ""
+                        --           |> String.replace "[" ""
+                        --           |> String.replace "]" ""
+                        --           |> String.replace "),(" ") ("
+                        --ans4 = Debug.toString  (ans3)
+                        ans4 =
+                            Debug.toString ans2
+                                |> String.replace "\"" ""
+                                |> String.replace "OFloat" ""
+                                |> String.replace "[" ""
+                                |> String.replace "]" ""
+                                |> String.replace "," " ="
+                                |> String.replace ") =(" " , "
+
+                        --|> String.replace "(" ""
+                        --|> String.replace ")" ""
+                        --|> String.replace "Stack Dict.fromList " ""
+                    in
+                    ans4 ++ " -> " ++ log ++ "[" ++ env
+    in
+    result
+
+
 
 ------------------------------------------------------
-script3 = """
+
+
+script3 =
+    """
   let a = 1;
   let b = 0;
   let c = 0;

@@ -1,9 +1,32 @@
-module Expr exposing (..)
+--module Expr exposing (..)
 
-import Parser exposing (..)
-import Dict exposing (Dict)
-import Set exposing (Set)
+module Expr exposing
+    ( ArgValue(..)
+    , Context(..)
+    , Expr(..)
+    , ExprResult(..)
+    , Input
+    , OutVal(..)
+    , addConstant
+    , addFunction
+    , dicPop
+    , dicPush
+    , empty
+    , evaluate
+    , expression
+    , formalArgValues
+    , getConstant
+    , newConstant
+    , setConstant
+    , typevar
+    , exprexec  -- UNIT TEST
+    , exprexec2 -- UNIT TEST
+    )
+
 import Array
+import Dict exposing (Dict)
+import Parser exposing (..)
+import Set exposing (Set)
 import Stack
 
 
@@ -12,119 +35,140 @@ import Stack
 
 
 type Expr
-  = Integer Int
-  | Floating Float
-  | String String
-  | Default Int
-  --| Array (Array.Array OutVal)
-  | Array (Array.Array ArgValue)
-  | Dict (Dict String ArgValue)
-  --| Dict (Dict ArgValue ArgValue)
-  | Bool Bool
-  --| Variable OutVal
-  | Variable String
-  --| Function String (Array.Array ArgValue)
-  | Function String (List Expr)
-  | ArrayIndex String Int
-  | DictLookUp String String
-  | DictIndex String String
-  | Add Expr Expr   --[+]  String Float
-  | Sub Expr Expr   --[-]  Float
-  | Mul Expr Expr   --[*]  Float
-  | Div Expr Expr   --[/]  Float
-  | Div2 Expr Expr  --[//] Float
-  | Div3 Expr Expr  --[%]  Float
-  | And  Expr Expr  --[&&] Bool
-  | Or   Expr Expr  --[||] Bool
-  | LT   Expr Expr  --[<]  Bool
-  | GT   Expr Expr  --[>]  Bool
-  | LE   Expr Expr  --[<=] Bool
-  | GE   Expr Expr  --[>=] Bool
-  | EQ   Expr Expr  --[==] Bool
-  | NE   Expr Expr  --[!=] Bool
+    = Integer Int
+    | Floating Float
+    | String String
+    | Default Int
+      --| Array (Array.Array OutVal)
+    | Array (Array.Array ArgValue)
+    | Dict (Dict String ArgValue)
+      --| Dict (Dict ArgValue ArgValue)
+    | Bool Bool
+      --| Variable OutVal
+    | Variable String
+      --| Function String (Array.Array ArgValue)
+    | Function String (List Expr)
+    | ArrayIndex String Int
+    | DictLookUp String String
+    | DictIndex String String
+    | Add Expr Expr --[+]  String Float
+    | Sub Expr Expr --[-]  Float
+    | Mul Expr Expr --[*]  Float
+    | Div Expr Expr --[/]  Float
+    | Div2 Expr Expr --[//] Float
+    | Div3 Expr Expr --[%]  Float
+    | And Expr Expr --[&&] Bool
+    | Or Expr Expr --[||] Bool
+    | LT Expr Expr --[<]  Bool
+    | GT Expr Expr --[>]  Bool
+    | LE Expr Expr --[<=] Bool
+    | GE Expr Expr --[>=] Bool
+    | EQ Expr Expr --[==] Bool
+    | NE Expr Expr --[!=] Bool
+
 
 type OutVal
-  = OFloat  Float
-  | OString String
-  | OBool Bool
-  | OArray (Array.Array OutVal)
-  --| ODict  (Dict OutVal OutVal)
-  | ODict  (Dict String OutVal)
+    = OFloat Float
+    | OString String
+    | OBool Bool
+    | OArray (Array.Array OutVal)
+      --| ODict  (Dict OutVal OutVal)
+    | ODict (Dict String OutVal)
+
 
 
 --------------------------------------------------------- stack
 
+
 dicGetSerch : List (Dict.Dict String OutVal) -> String -> Result String OutVal
 dicGetSerch list name =
-     let
-        dict_ =  List.head list  |> Maybe.withDefault Dict.empty
-        value = Dict.get name dict_
-     in
-       case value of
-          Just a ->
-                Ok  a
-          _ ->
-             let
-               new_list = List.drop 1 list
-             in
-             if List.isEmpty new_list then
-                Err ("dicGetSerch...not found:" ++ name)
-             else
-                dicGetSerch new_list name
+    let
+        dict_ =
+            List.head list |> Maybe.withDefault Dict.empty
 
-                 
+        value =
+            Dict.get name dict_
+    in
+    case value of
+        Just a ->
+            Ok a
+
+        _ ->
+            let
+                new_list =
+                    List.drop 1 list
+            in
+            if List.isEmpty new_list then
+                Err ("dicGetSerch...not found:" ++ name)
+
+            else
+                dicGetSerch new_list name
 
 
 dicGet : String -> Stack.Stack (Dict.Dict String OutVal) -> Result String OutVal
-dicGet name  stackdic =
-      let
-       list = Stack.toList stackdic
-      in
-      dicGetSerch list name
+dicGet name stackdic =
+    let
+        list =
+            Stack.toList stackdic
+    in
+    dicGetSerch list name
 
 
-
-
-dicSetUpdate : String -> OutVal ->  Stack.Stack (Dict.Dict String OutVal) ->  Result String (Stack.Stack (Dict.Dict String OutVal))
+dicSetUpdate : String -> OutVal -> Stack.Stack (Dict.Dict String OutVal) -> Result String (Stack.Stack (Dict.Dict String OutVal))
 dicSetUpdate name value stackdic =
-     let
-        (dict1, stack_) =  Stack.pop stackdic  
-        dict2 = case dict1 of
-                   Just dict_ ->
-                            dict_
-                   _ ->
-                            Dict.empty
-        value2 = Dict.get name dict2
-     in
-       case value2 of
-          Just a ->
-                let 
-                 tmp_dict = Dict.insert name value dict2
-                in
-                Ok (Stack.push tmp_dict stack_)
-          _ ->
-             let
-               tmp_list = Stack.toList stack_
+    let
+        ( dict1, stack_ ) =
+            Stack.pop stackdic
 
-             in
-             if List.isEmpty tmp_list then
+        dict2 =
+            case dict1 of
+                Just dict_ ->
+                    dict_
+
+                _ ->
+                    Dict.empty
+
+        value2 =
+            Dict.get name dict2
+    in
+    case value2 of
+        Just a ->
+            let
+                tmp_dict =
+                    Dict.insert name value dict2
+            in
+            Ok (Stack.push tmp_dict stack_)
+
+        _ ->
+            let
+                tmp_list =
+                    Stack.toList stack_
+            in
+            if List.isEmpty tmp_list then
                 Err ("dicSetUpdate...not found:" ++ name)
-             else
-              let
-                new_stack_pair = dicSetUpdate  name value stack_ 
-              in
+
+            else
+                let
+                    new_stack_pair =
+                        dicSetUpdate name value stack_
+                in
                 case new_stack_pair of
                     Ok new_stack_ ->
-                          Ok (Stack.push dict2 new_stack_)
+                        Ok (Stack.push dict2 new_stack_)
+
                     Err str ->
-                          Err str
+                        Err str
+
 
 dicSet : String -> OutVal -> Stack.Stack (Dict.Dict String OutVal) -> Result String (Stack.Stack (Dict.Dict String OutVal))
 dicSet name value stackdic =
-      let
-       result = dicSetUpdate name value stackdic 
-      in
-      result
+    let
+        result =
+            dicSetUpdate name value stackdic
+    in
+    result
+
+
 
 {--
 dicSet : String -> OutVal -> Stack.Stack (Dict.Dict String OutVal) -> Stack.Stack (Dict.Dict String OutVal)
@@ -139,39 +183,54 @@ dicSet name value stackdic =
                 stackdic
 --}
 
+
 dicSetNewLocal : String -> OutVal -> Stack.Stack (Dict.Dict String OutVal) -> Stack.Stack (Dict.Dict String OutVal)
 dicSetNewLocal name value stackdic =
-     let
-        (dict1, stack_) =  Stack.pop stackdic  
-        dict2 = case dict1 of
-                   Just dict_ ->
-                            dict_
-                   _ ->
-                            Dict.empty
-        value2 = Dict.insert name value dict2
-     in
-      Stack.push value2 stack_
+    let
+        ( dict1, stack_ ) =
+            Stack.pop stackdic
 
-dicPop : Stack.Stack (Dict.Dict String OutVal) ->Stack.Stack (Dict.Dict String OutVal)
+        dict2 =
+            case dict1 of
+                Just dict_ ->
+                    dict_
+
+                _ ->
+                    Dict.empty
+
+        value2 =
+            Dict.insert name value dict2
+    in
+    Stack.push value2 stack_
+
+
+dicPop : Stack.Stack (Dict.Dict String OutVal) -> Stack.Stack (Dict.Dict String OutVal)
 dicPop stackdic =
-      let
-       (a, newdic) = Stack.pop stackdic
-      in
-       newdic
+    let
+        ( a, newdic ) =
+            Stack.pop stackdic
+    in
+    newdic
 
-dicPush : Stack.Stack (Dict.Dict String OutVal) ->Stack.Stack (Dict.Dict String OutVal)
+
+dicPush : Stack.Stack (Dict.Dict String OutVal) -> Stack.Stack (Dict.Dict String OutVal)
 dicPush stackdic =
-     let
-        dict_ = Dict.empty
-     in
-       Stack.push dict_ stackdic
+    let
+        dict_ =
+            Dict.empty
+    in
+    Stack.push dict_ stackdic
 
 
-dicInit :  Stack.Stack (Dict.Dict String OutVal)
-dicInit  =
-     Stack.initialise
+dicInit : Stack.Stack (Dict.Dict String OutVal)
+dicInit =
+    Stack.initialise
+
+
 
 --------------------------------------------------------- context
+
+
 type Context
     = Context
         --{ constants : Dict String OutVal
@@ -186,10 +245,11 @@ type Context
         , defvar : Bool
         }
 
+
 empty : Context
 empty =
     --let
-    --  stack = Stack.initialise 
+    --  stack = Stack.initialise
     --  stack_ = Stack.push Dict.empty stack
     --in
     Context
@@ -205,26 +265,32 @@ empty =
         , defvar = True
         }
 
+
 addConstant : String -> OutVal -> Context -> Context
 addConstant name value (Context context) =
     let
-       r = dicSet name value context.constants
-       (new_constants, log_) = case r of
-                         Ok a ->
-                            let
-                              log = context.log ++ ">" ++ name ++ " "
-                            in
-                            (a,log)
-                         Err a ->
-                            let
-                              log = context.log ++ "*" ++ name ++ " "
-                            in
-                            (dicSetNewLocal name value context.constants, log)
+        r =
+            dicSet name value context.constants
 
+        ( new_constants, log_ ) =
+            case r of
+                Ok a ->
+                    let
+                        log =
+                            context.log ++ ">" ++ name ++ " "
+                    in
+                    ( a, log )
+
+                Err a ->
+                    let
+                        log =
+                            context.log ++ "*" ++ name ++ " "
+                    in
+                    ( dicSetNewLocal name value context.constants, log )
     in
     Context
         { context
-            | constants = new_constants 
+            | constants = new_constants
             , log = log_
         }
 
@@ -232,12 +298,15 @@ addConstant name value (Context context) =
 newConstant : String -> OutVal -> Context -> Context
 newConstant name value (Context context) =
     let
-      log = context.log ++ "*" ++ name ++ " "
-      (new_constants, log_) = (dicSetNewLocal name value context.constants, log)
+        log =
+            context.log ++ "*" ++ name ++ " "
+
+        ( new_constants, log_ ) =
+            ( dicSetNewLocal name value context.constants, log )
     in
     Context
         { context
-            | constants = new_constants 
+            | constants = new_constants
             , log = log_
         }
 
@@ -245,25 +314,31 @@ newConstant name value (Context context) =
 setConstant : String -> OutVal -> Context -> Context
 setConstant name value (Context context) =
     let
-       r = dicSet name value context.constants
-       (new_constants, log_) = case r of
-                         Ok a ->
-                            let
-                              log = context.log ++ ">" ++ name ++ " "
-                            in
-                            (a,log)
-                         Err a ->
-                            let
-                              log = context.log ++ "@" ++ name ++ " "
-                            in
-                            (context.constants,log)
+        r =
+            dicSet name value context.constants
 
+        ( new_constants, log_ ) =
+            case r of
+                Ok a ->
+                    let
+                        log =
+                            context.log ++ ">" ++ name ++ " "
+                    in
+                    ( a, log )
+
+                Err a ->
+                    let
+                        log =
+                            context.log ++ "@" ++ name ++ " "
+                    in
+                    ( context.constants, log )
     in
     Context
         { context
-            | constants = new_constants 
+            | constants = new_constants
             , log = log_
         }
+
 
 addFunction : String -> (Context -> Input -> OutVal) -> Context -> Context
 addFunction name f (Context context) =
@@ -276,13 +351,15 @@ addFunction name f (Context context) =
 getConstant : String -> Context -> Maybe OutVal
 getConstant name (Context { constants }) =
     --Dict.get name constants
-    let 
-     r = dicGet name constants
+    let
+        r =
+            dicGet name constants
     in
     case r of
-       Ok a ->
+        Ok a ->
             Just a
-       Err a ->
+
+        Err a ->
             Just (OString a)
 
 
@@ -291,53 +368,70 @@ getFunction name (Context { functions }) =
     Dict.get name functions
 
 
+
 --------------------------------------------------------- evalate
+
+
 type ExprResult error value notfound
     = ExprOk value
     | ExprNotFoundFunc notfound
     | ExprErr error
 
-argsToAvArgs : userenv -> (userenv -> Context -> String -> (Array.Array ArgValue) -> OutVal) -> Context ->List Expr -> Input
-argsToAvArgs userenv userfunc context exprs =
-     let
-       func3 expr =
-           let
-             value = evaluate userenv userfunc context expr
-           in
-           case value of
-                (ExprOk (OString a)) ->
-                      AvString a
-                (ExprOk (OFloat a)) ->
-                      AvFloat a
-                (ExprOk (OBool a)) ->
-                      AvBool a
-                _ ->
-                      AvString "CVNG"
 
-       args = List.map func3 exprs
-     in 
-     Array.fromList args
+argsToAvArgs : userenv -> (userenv -> Context -> String -> Array.Array ArgValue -> OutVal) -> Context -> List Expr -> Input
+argsToAvArgs userenv userfunc context exprs =
+    let
+        func3 expr =
+            let
+                value =
+                    evaluate userenv userfunc context expr
+            in
+            case value of
+                ExprOk (OString a) ->
+                    AvString a
+
+                ExprOk (OFloat a) ->
+                    AvFloat a
+
+                ExprOk (OBool a) ->
+                    AvBool a
+
+                _ ->
+                    AvString "CVNG"
+
+        args =
+            List.map func3 exprs
+    in
+    Array.fromList args
+
+
 
 --evaluate : Expr -> OutVal
 --evaluate :  Context -> Expr -> OutVal
 --evaluate :  Context -> Expr -> ExprResult String OutVal (String, (Array.Array ArgValue))
 --evaluate :  (UserEnv -> Context -> String -> (Array.Array ArgValue) -> OutVal) -> Context -> Expr -> ExprResult String OutVal (String, (Array.Array ArgValue))
-evaluate :  userenv -> (userenv -> Context -> String -> (Array.Array ArgValue) -> OutVal) -> Context -> Expr -> ExprResult String OutVal (String, (Array.Array ArgValue))
-evaluate  userenv userfunc context expr =
-  case expr of
-    Variable name ->
-       let
-          --value = OString "testOK"
-          value = getConstant name context
-          result = case value of
-                      Just v ->
-                             v
-                      _ ->
-                             (OString ("not_found constant:" ++ name))
-       in
-       ExprOk result
-     
-{--
+
+
+evaluate : userenv -> (userenv -> Context -> String -> Array.Array ArgValue -> OutVal) -> Context -> Expr -> ExprResult String OutVal ( String, Array.Array ArgValue )
+evaluate userenv userfunc context expr =
+    case expr of
+        Variable name ->
+            let
+                --value = OString "testOK"
+                value =
+                    getConstant name context
+
+                result =
+                    case value of
+                        Just v ->
+                            v
+
+                        _ ->
+                            OString ("not_found constant:" ++ name)
+            in
+            ExprOk result
+
+        {--
     Function name args ->
          let
            func_ = getFunction name context
@@ -350,138 +444,175 @@ evaluate  userenv userfunc context expr =
                             --ExprNotFoundFunc  (name,args)
                             ExprOk (userfunc  userenv context name args)
 --}
+        Function name args ->
+            let
+                func_ =
+                    getFunction name context
 
-    Function name args ->
-         let
-           func_ = getFunction name context
-           args_ = argsToAvArgs userenv userfunc context args
-         in
-           case func_ of
-                     Just f ->
-                            ExprOk (f context args_)
-                     _ ->
-                            --ExprNotFoundFunc  ("**not_found function:" ++ name)
-                            --ExprNotFoundFunc  (name,args)
-                            ExprOk (userfunc  userenv context name args_)
+                args_ =
+                    argsToAvArgs userenv userfunc context args
+            in
+            case func_ of
+                Just f ->
+                    ExprOk (f context args_)
 
-    ArrayIndex name index ->
-         let
-           array_ = getConstant name context
-           ans = case array_ of
-                     Just a ->
-                          case a of
-                            OArray a_->
-                               let
-                                 a2 = Array.get index a_
-                               in
-                               case a2 of
-                                  Just a2_ ->
-                                         a2_
-                                  _ ->
-                                         (OString " !!not_found arrayIndex")
-                            _ ->
-                                  (OString " !!not_found arrayIndex")
-                     _ ->
-                           (OString " !!not_found ArrayIndex")
-         in
-         ExprOk ans
-         --(OString " !!array_index")
+                _ ->
+                    --ExprNotFoundFunc  ("**not_found function:" ++ name)
+                    --ExprNotFoundFunc  (name,args)
+                    ExprOk (userfunc userenv context name args_)
 
-    DictLookUp name key ->
-         let
-           dict_ = getConstant name context
-           ans = case dict_ of
-                     Just d ->
-                          case d of
-                            ODict d_->
-                               let
-                                 d2 = Dict.get key d_
-                               in
-                               case d2 of
-                                  Just d2_ ->
-                                         d2_
-                                  _ ->
-                                         (OString " !!not_found dictlookup")
-                            _ ->
-                                  (OString " !!not_found dict lookuo")
-                     _ ->
-                           (OString " !!not_found dict lookup")
-         in
-         ExprOk ans
-         --(OString " !!array_index")
+        ArrayIndex name index ->
+            let
+                array_ =
+                    getConstant name context
 
-    DictIndex name key ->
-         let
-           dict_ = getConstant name context
-           ans = case dict_ of
-                     Just d ->
-                          case d of
-                            ODict d_->
-                               let
-                                 d2 = Dict.get key d_
-                               in
-                               case d2 of
-                                  Just d2_ ->
-                                         d2_
-                                  _ ->
-                                         (OString " !!not_found dictIndex")
-                            _ ->
-                                  (OString " !!not_found dictIndex")
-                     _ ->
-                           (OString " !!not_found dictIndex")
-         in
-         ExprOk ans
-         --(OString " !!array_index")
-    String s ->
-     ExprOk (OString  s)
+                ans =
+                    case array_ of
+                        Just a ->
+                            case a of
+                                OArray a_ ->
+                                    let
+                                        a2 =
+                                            Array.get index a_
+                                    in
+                                    case a2 of
+                                        Just a2_ ->
+                                            a2_
 
-    Integer n ->
-     ExprOk (OFloat (toFloat n))
+                                        _ ->
+                                            OString " !!not_found arrayIndex"
 
-    Floating n ->
-     ExprOk (OFloat  n)
+                                _ ->
+                                    OString " !!not_found arrayIndex"
 
-    Bool n ->
-     ExprOk (OBool  n)
+                        _ ->
+                            OString " !!not_found ArrayIndex"
+            in
+            ExprOk ans
 
-    Array an ->
-     let
-        conv e = 
-           case e of
-              AvInt n -> 
-                  OFloat (toFloat n)
-              AvBool n ->
-                  OBool n
-              AvFloat n ->
-                  OFloat n
-              AvString n ->
-                  OString n
-              AvVar n ->
-                  OString n
-        arr2 = Array.map conv an
-     in
-     ExprOk (OArray arr2)
+        --(OString " !!array_index")
+        DictLookUp name key ->
+            let
+                dict_ =
+                    getConstant name context
 
-    Dict dt ->
-     let
-        conv k v = 
-           case v of
-              AvInt n -> 
-                  OFloat (toFloat n)
-              AvBool n ->
-                  OBool n
-              AvFloat n ->
-                  OFloat n
-              AvString n ->
-                  OString n
-              AvVar n ->
-                  OString n
-        dt2 = Dict.map conv dt
-     in
-     ExprOk (ODict dt2)
+                ans =
+                    case dict_ of
+                        Just d ->
+                            case d of
+                                ODict d_ ->
+                                    let
+                                        d2 =
+                                            Dict.get key d_
+                                    in
+                                    case d2 of
+                                        Just d2_ ->
+                                            d2_
 
-    Add a b ->
-    {--
+                                        _ ->
+                                            OString " !!not_found dictlookup"
+
+                                _ ->
+                                    OString " !!not_found dict lookuo"
+
+                        _ ->
+                            OString " !!not_found dict lookup"
+            in
+            ExprOk ans
+
+        --(OString " !!array_index")
+        DictIndex name key ->
+            let
+                dict_ =
+                    getConstant name context
+
+                ans =
+                    case dict_ of
+                        Just d ->
+                            case d of
+                                ODict d_ ->
+                                    let
+                                        d2 =
+                                            Dict.get key d_
+                                    in
+                                    case d2 of
+                                        Just d2_ ->
+                                            d2_
+
+                                        _ ->
+                                            OString " !!not_found dictIndex"
+
+                                _ ->
+                                    OString " !!not_found dictIndex"
+
+                        _ ->
+                            OString " !!not_found dictIndex"
+            in
+            ExprOk ans
+
+        --(OString " !!array_index")
+        String s ->
+            ExprOk (OString s)
+
+        Integer n ->
+            ExprOk (OFloat (toFloat n))
+
+        Floating n ->
+            ExprOk (OFloat n)
+
+        Bool n ->
+            ExprOk (OBool n)
+
+        Array an ->
+            let
+                conv e =
+                    case e of
+                        AvInt n ->
+                            OFloat (toFloat n)
+
+                        AvBool n ->
+                            OBool n
+
+                        AvFloat n ->
+                            OFloat n
+
+                        AvString n ->
+                            OString n
+
+                        AvVar n ->
+                            OString n
+
+                arr2 =
+                    Array.map conv an
+            in
+            ExprOk (OArray arr2)
+
+        Dict dt ->
+            let
+                conv k v =
+                    case v of
+                        AvInt n ->
+                            OFloat (toFloat n)
+
+                        AvBool n ->
+                            OBool n
+
+                        AvFloat n ->
+                            OFloat n
+
+                        AvString n ->
+                            OString n
+
+                        AvVar n ->
+                            OString n
+
+                dt2 =
+                    Dict.map conv dt
+            in
+            ExprOk (ODict dt2)
+
+        Add a b ->
+            {--
      let
        a_ = case (evaluate a) of
                OFloat n -> n
@@ -492,216 +623,344 @@ evaluate  userenv userfunc context expr =
      in
      OFloat ( a_ +  b_)
     --}
-     let
-       a_ = evaluate userenv userfunc context a
-       b_ = evaluate userenv userfunc context b
-     in
-     case (a_, b_) of
-        (ExprOk (OFloat aa),  ExprOk (OFloat bb)) ->
-                ExprOk (OFloat  ( aa + bb ))
+            let
+                a_ =
+                    evaluate userenv userfunc context a
 
-        (ExprOk (OString aa), ExprOk (OString bb)) ->
-                ExprOk (OString ( aa ++ bb ))
-        _ ->
-                ExprOk (OFloat 0)
+                b_ =
+                    evaluate userenv userfunc context b
+            in
+            case ( a_, b_ ) of
+                ( ExprOk (OFloat aa), ExprOk (OFloat bb) ) ->
+                    ExprOk (OFloat (aa + bb))
 
-    Sub a b ->
-     let
-       a_ = case (evaluate userenv userfunc context a) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-       b_ = case (evaluate userenv userfunc context b) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-     in
-     ExprOk (OFloat ( a_ -  b_))
+                ( ExprOk (OString aa), ExprOk (OString bb) ) ->
+                    ExprOk (OString (aa ++ bb))
 
-    Mul a b ->
-     let
-       a_ = case (evaluate userenv userfunc context a) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-       b_ = case (evaluate userenv userfunc context b) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-     in
-     ExprOk (OFloat ( a_ *  b_))
+                _ ->
+                    ExprOk (OFloat 0)
 
-    Div a b ->
-     let
-       a_ = case (evaluate userenv userfunc context a) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-       b_ = case (evaluate userenv userfunc context b) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-     in
-     ExprOk (OFloat ( a_ / b_))
+        Sub a b ->
+            let
+                a_ =
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
 
-    Div2 a b ->
-     let
-       a_ = case (evaluate userenv userfunc context a) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-       b_ = case (evaluate userenv userfunc context b) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-     in
-     ExprOk (OFloat ((toFloat ((floor a_) // (floor  b_)))))
+                        _ ->
+                            0
 
-    Div3 a b ->
-     let
-       a_ = case (evaluate userenv userfunc context a) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-       b_ = case (evaluate userenv userfunc context b) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-     in
-      let
-        a2 = floor  a_ 
-        b2 = floor  b_ 
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
 
-        div_ = a2 // b2
-        ans_ = a2 - (div_ * b2)
+                        _ ->
+                            0
+            in
+            ExprOk (OFloat (a_ - b_))
 
-      in
-      ExprOk (OFloat (toFloat ans_))
+        Mul a b ->
+            let
+                a_ =
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
 
-    And a b ->
-     let
-       a_ = case (evaluate userenv userfunc context a) of
-               ExprOk (OBool n) -> n
-               _ -> False
-       b_ = case (evaluate userenv userfunc context b) of
-               ExprOk (OBool n) -> n
-               _ -> False
-     in
-     ExprOk (OBool ( a_ && b_))
+                        _ ->
+                            0
 
-    Or a b ->
-     let
-       a_ = case (evaluate userenv userfunc context a) of
-               ExprOk (OBool n) -> n
-               _ -> False
-       b_ = case (evaluate userenv userfunc context b) of
-               ExprOk (OBool n) -> n
-               _ -> False
-     in
-     ExprOk (OBool ( a_ || b_))
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
 
-    -----------------------
-    LT a b ->
-     let
-       a_ = case (evaluate userenv userfunc context a) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-       b_ = case (evaluate userenv userfunc context b) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-     in
-     ExprOk (OBool ( a_ < b_))
+                        _ ->
+                            0
+            in
+            ExprOk (OFloat (a_ * b_))
 
-    GT a b ->
-     let
-       a_ = case (evaluate userenv userfunc context a) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-       b_ = case (evaluate userenv userfunc context b) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-     in
-     ExprOk (OBool ( a_ > b_))
+        Div a b ->
+            let
+                a_ =
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
 
-    LE a b ->
-     let
-       a_ = case (evaluate userenv userfunc context a) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-       b_ = case (evaluate userenv userfunc context b) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-     in
-     ExprOk (OBool ( a_ <= b_))
+                        _ ->
+                            0
 
-    GE a b ->
-     let
-       a_ = case (evaluate userenv userfunc context a) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-       b_ = case (evaluate userenv userfunc context b) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-     in
-     ExprOk (OBool ( a_ >= b_))
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
 
-    EQ a b ->
-     let
-       a_ = case (evaluate userenv userfunc context a) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-       b_ = case (evaluate userenv userfunc context b) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-     in
-     ExprOk (OBool ( a_ == b_))
+                        _ ->
+                            0
+            in
+            ExprOk (OFloat (a_ / b_))
 
-    NE a b ->
-     let
-       a_ = case (evaluate userenv userfunc context a) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-       b_ = case (evaluate userenv userfunc context b) of
-               ExprOk (OFloat n) -> n
-               _ -> 0
-     in
-     ExprOk (OBool ( a_ /= b_))
+        Div2 a b ->
+            let
+                a_ =
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
 
-    Default a  ->
-     ExprOk (OBool True)
+                        _ ->
+                            0
+
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+            in
+            ExprOk (OFloat (toFloat (floor a_ // floor b_)))
+
+        Div3 a b ->
+            let
+                a_ =
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+            in
+            let
+                a2 =
+                    floor a_
+
+                b2 =
+                    floor b_
+
+                div_ =
+                    a2 // b2
+
+                ans_ =
+                    a2 - (div_ * b2)
+            in
+            ExprOk (OFloat (toFloat ans_))
+
+        And a b ->
+            let
+                a_ =
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OBool n) ->
+                            n
+
+                        _ ->
+                            False
+
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OBool n) ->
+                            n
+
+                        _ ->
+                            False
+            in
+            ExprOk (OBool (a_ && b_))
+
+        Or a b ->
+            let
+                a_ =
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OBool n) ->
+                            n
+
+                        _ ->
+                            False
+
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OBool n) ->
+                            n
+
+                        _ ->
+                            False
+            in
+            ExprOk (OBool (a_ || b_))
+
+        -----------------------
+        LT a b ->
+            let
+                a_ =
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+            in
+            ExprOk (OBool (a_ < b_))
+
+        GT a b ->
+            let
+                a_ =
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+            in
+            ExprOk (OBool (a_ > b_))
+
+        LE a b ->
+            let
+                a_ =
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+            in
+            ExprOk (OBool (a_ <= b_))
+
+        GE a b ->
+            let
+                a_ =
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+            in
+            ExprOk (OBool (a_ >= b_))
+
+        EQ a b ->
+            let
+                a_ =
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+            in
+            ExprOk (OBool (a_ == b_))
+
+        NE a b ->
+            let
+                a_ =
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+            in
+            ExprOk (OBool (a_ /= b_))
+
+        Default a ->
+            ExprOk (OBool True)
+
 
 parse : String -> Result (List DeadEnd) Expr
 parse string__ =
-  run expression string__
+    run expression string__
+
 
 
 -- STRINGS
-
-
 --string : Parser String
+
+
 string : Parser Expr
 string =
-  --succeed (String identity)
-  succeed (\identity -> String identity)
-    |. token "\""
-    |= loop [] stringHelp
+    --succeed (String identity)
+    succeed (\identity -> String identity)
+        |. token "\""
+        |= loop [] stringHelp
 
 
 stringHelp : List String -> Parser (Step (List String) String)
 stringHelp revChunks =
-  oneOf
-    [ succeed (\chunk -> Loop (chunk :: revChunks))
-        |. token "\\"
-        |= oneOf
-            [ map (\_ -> "\n") (token "n")
-            , map (\_ -> "\t") (token "t")
-            , map (\_ -> "\r") (token "r")
-            , succeed String.fromChar
-                |. token "u{"
-                |= unicode
-                |. token "}"
-            ]
-    , token "\""
-        |> map (\_ -> Done (String.join "" (List.reverse revChunks)))
-    , chompWhile isUninteresting
-        |> getChompedString
-        |> map (\chunk -> Loop (chunk :: revChunks))
-    ]
+    oneOf
+        [ succeed (\chunk -> Loop (chunk :: revChunks))
+            |. token "\\"
+            |= oneOf
+                [ map (\_ -> "\n") (token "n")
+                , map (\_ -> "\t") (token "t")
+                , map (\_ -> "\u{000D}") (token "r")
+                , succeed String.fromChar
+                    |. token "u{"
+                    |= unicode
+                    |. token "}"
+                ]
+        , token "\""
+            |> map (\_ -> Done (String.join "" (List.reverse revChunks)))
+        , chompWhile isUninteresting
+            |> getChompedString
+            |> map (\chunk -> Loop (chunk :: revChunks))
+        ]
 
 
 isUninteresting : Char -> Bool
 isUninteresting char =
-  char /= '\\' && char /= '"'
+    char /= '\\' && char /= '"'
 
 
 
@@ -710,54 +969,66 @@ isUninteresting char =
 
 unicode : Parser Char
 unicode =
-  getChompedString (chompWhile Char.isHexDigit)
-    |> andThen codeToChar
+    getChompedString (chompWhile Char.isHexDigit)
+        |> andThen codeToChar
 
 
 codeToChar : String -> Parser Char
 codeToChar str =
-  let
-    length = String.length str
-    code = String.foldl addHex 0 str
-  in
-  if 4 <= length && length <= 6 then
-    problem "code point must have between 4 and 6 digits"
-  else if 0 <= code && code <= 0x10FFFF then
-    succeed (Char.fromCode code)
-  else
-    problem "code point must be between 0 and 0x10FFFF"
+    let
+        length =
+            String.length str
+
+        code =
+            String.foldl addHex 0 str
+    in
+    if 4 <= length && length <= 6 then
+        problem "code point must have between 4 and 6 digits"
+
+    else if 0 <= code && code <= 0x0010FFFF then
+        succeed (Char.fromCode code)
+
+    else
+        problem "code point must be between 0 and 0x10FFFF"
 
 
 addHex : Char -> Int -> Int
 addHex char total =
-  let
-    code = Char.toCode char
-  in
-  if 0x30 <= code && code <= 0x39 then
-    16 * total + (code - 0x30)
-  else if 0x41 <= code && code <= 0x46 then
-    16 * total + (10 + code - 0x41)
-  else
-    16 * total + (10 + code - 0x61)
+    let
+        code =
+            Char.toCode char
+    in
+    if 0x30 <= code && code <= 0x39 then
+        16 * total + (code - 0x30)
+
+    else if 0x41 <= code && code <= 0x46 then
+        16 * total + (10 + code - 0x41)
+
+    else
+        16 * total + (10 + code - 0x61)
 
 
 typevar : Parser Expr
 typevar =
-  succeed (\identity -> Variable identity)
-    |= typevarHelp
+    succeed (\identity -> Variable identity)
+        |= typevarHelp
+
 
 typevarHelp : Parser String
 typevarHelp =
-  variable
-    { start = Char.isLower
-    , inner = \c -> Char.isAlphaNum c || c == '_'
-    , reserved = Set.fromList [ "if", "then", "else", "elsif","while" , "do", "end", "for", "case", "let", "fn", "return","break","continue"]
-    }
+    variable
+        { start = Char.isLower
+        , inner = \c -> Char.isAlphaNum c || c == '_'
+        , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
+        }
+
 
 default : Parser Expr
 default =
-  succeed ( Default 1)
-    |. keyword "default"
+    succeed (Default 1)
+        |. keyword "default"
+
+
 
 {--
 array : Parser Expr
@@ -789,124 +1060,138 @@ arrayHelp revChunks =
         |> map (\chunk -> Loop (chunk :: revChunks))
     ]
 --}
-
 ---------------------------------------------
+
+
 array : Parser Expr
 array =
     succeed Tuple.pair
         |. backtrackable (symbol "[")
-        |= arrayValues 
+        |= arrayValues
         |= symbol "]"
         |> andThen
-            (\( arg, a)  ->
+            (\( arg, a ) ->
                 let
-                  base = Array.fromList arg
-
+                    base =
+                        Array.fromList arg
                 in
                 succeed (Array base)
             )
 
-arrayValues :  Parser (List ArgValue)
-arrayValues  =
-  succeed (::)
-    |. spaces
-    |= oneOf
-        [ backtrackable  stringValue
-        , backtrackable  intValue
-        , backtrackable  floatValue
-        , varValue
-        ]
-    |. spaces
-    |= arrayValuesTail 
-    |> andThen
-            (\( arg ) ->
-                 succeed (arg)
-            )
 
-arrayValuesTail :  Parser (List ArgValue)
-arrayValuesTail  =
-  oneOf
-    [ succeed (::)
-        |. symbol ","
+arrayValues : Parser (List ArgValue)
+arrayValues =
+    succeed (::)
         |. spaces
         |= oneOf
-            [ backtrackable  stringValue
-            , backtrackable  intValue
-            , backtrackable  floatValue
+            [ backtrackable stringValue
+            , backtrackable intValue
+            , backtrackable floatValue
             , varValue
             ]
         |. spaces
-        |= lazy (\_ ->  arrayValuesTail )
-    , succeed []
-    ]
+        |= arrayValuesTail
+        |> andThen
+            (\arg ->
+                succeed arg
+            )
+
+
+arrayValuesTail : Parser (List ArgValue)
+arrayValuesTail =
+    oneOf
+        [ succeed (::)
+            |. symbol ","
+            |. spaces
+            |= oneOf
+                [ backtrackable stringValue
+                , backtrackable intValue
+                , backtrackable floatValue
+                , varValue
+                ]
+            |. spaces
+            |= lazy (\_ -> arrayValuesTail)
+        , succeed []
+        ]
+
+
 
 ---------------------------------------------
+
+
 dict : Parser Expr
 dict =
     succeed Tuple.pair
         |. backtrackable (symbol "{")
-        |= dictValues 
+        |= dictValues
         |= symbol "}"
         |> andThen
-            (\( arg, a)  ->
+            (\( arg, a ) ->
                 let
-                  base = Dict.fromList arg
-
+                    base =
+                        Dict.fromList arg
                 in
                 succeed (Dict base)
             )
 
+
 dictKey : Parser String
 dictKey =
-  succeed   Just
-    |. spaces
-    |. symbol "\""
-    |= getChompedString (chompWhile (\c -> c /= '"'))
-    |. symbol "\""
-    |. spaces
-    |> andThen
-            (\( arg ) ->
-                 --succeed (AvString (arg   |> Maybe.withDefault "" ))
-                 succeed (arg   |> Maybe.withDefault "" )
+    succeed Just
+        |. spaces
+        |. symbol "\""
+        |= getChompedString (chompWhile (\c -> c /= '"'))
+        |. symbol "\""
+        |. spaces
+        |> andThen
+            (\arg ->
+                --succeed (AvString (arg   |> Maybe.withDefault "" ))
+                succeed (arg |> Maybe.withDefault "")
             )
 
-dictKV :  Parser (String, ArgValue)
-dictKV  =
-  succeed (\ k v -> (k, v))
-    |. spaces
-    |= dictKey
-    |. symbol ":"
-    |. spaces
-    |= oneOf
-        [ backtrackable  stringValue
-        , backtrackable  intValue
-        , backtrackable  floatValue
-        , varValue
-        ]
 
-dictValues :  Parser (List (String, ArgValue))
-dictValues  =
-  succeed (::)
-    |. spaces
-    |= dictKV
-    |. spaces
-    |= dictValuesTail 
-    |> andThen
-            (\( arg ) ->
-                 succeed (arg)
-            )
+dictKV : Parser ( String, ArgValue )
+dictKV =
+    succeed (\k v -> ( k, v ))
+        |. spaces
+        |= dictKey
+        |. symbol ":"
+        |. spaces
+        |= oneOf
+            [ backtrackable stringValue
+            , backtrackable intValue
+            , backtrackable floatValue
+            , varValue
+            ]
 
-dictValuesTail :  Parser (List (String, ArgValue))
-dictValuesTail  =
-  oneOf
-    [ succeed (::)
-        |. symbol ","
+
+dictValues : Parser (List ( String, ArgValue ))
+dictValues =
+    succeed (::)
         |. spaces
         |= dictKV
         |. spaces
-        |= lazy (\_ ->  dictValuesTail )
-    , succeed []
-    ]
+        |= dictValuesTail
+        |> andThen
+            (\arg ->
+                succeed arg
+            )
+
+
+dictValuesTail : Parser (List ( String, ArgValue ))
+dictValuesTail =
+    oneOf
+        [ succeed (::)
+            |. symbol ","
+            |. spaces
+            |= dictKV
+            |. spaces
+            |= lazy (\_ -> dictValuesTail)
+        , succeed []
+        ]
+
+
+
 {--
 dictValues :  Parser (List (ArgValue, ArgValue))
 dictValues  =
@@ -949,74 +1234,85 @@ dictValuesTail  =
     ]
 --}
 ----------------------------------------------------------
--- FUNC def  start 
+-- FUNC def  start
 ----------------------------------------------------------
-type ArgValue
-    = AvInt    Int
-    | AvBool   Bool
-    | AvFloat  Float
-    | AvString  String
-    | AvVar     String
 
-type alias Input
-    = Array.Array ArgValue
+
+type ArgValue
+    = AvInt Int
+    | AvBool Bool
+    | AvFloat Float
+    | AvString String
+    | AvVar String
+
+
+type alias Input =
+    Array.Array ArgValue
+
+
 
 -------------------------------------------------------------
 
+
 stringValue : Parser ArgValue
 stringValue =
-  --succeed   (::)
-  succeed   Just
-    |. spaces
-    |. symbol "\""
-    |= getChompedString (chompWhile (\c -> c /= '"'))
-    |. symbol "\""
-    |. spaces
-    |> andThen
-            (\( arg ) ->
-                 succeed (AvString (arg   |> Maybe.withDefault "" ))
+    --succeed   (::)
+    succeed Just
+        |. spaces
+        |. symbol "\""
+        |= getChompedString (chompWhile (\c -> c /= '"'))
+        |. symbol "\""
+        |. spaces
+        |> andThen
+            (\arg ->
+                succeed (AvString (arg |> Maybe.withDefault ""))
             )
 
 
 intValue : Parser ArgValue
 intValue =
-  --succeed (::)
-  succeed   Just
-    |. spaces
-    |= int
-    |. spaces
-    |> andThen
-            (\( arg ) ->
-                 --succeed (AvInt arg)
-                 succeed (AvInt (arg   |> Maybe.withDefault 0 ))
+    --succeed (::)
+    succeed Just
+        |. spaces
+        |= int
+        |. spaces
+        |> andThen
+            (\arg ->
+                --succeed (AvInt arg)
+                succeed (AvInt (arg |> Maybe.withDefault 0))
             )
+
 
 floatValue : Parser ArgValue
 floatValue =
-  --succeed (::)
-  succeed   Just
-    |. spaces
-    |= float
-    |. spaces
-    |> andThen
-            (\( arg ) ->
-                 --succeed (AvFloat arg)
-                 succeed (AvFloat (arg   |> Maybe.withDefault 0.0 ))
+    --succeed (::)
+    succeed Just
+        |. spaces
+        |= float
+        |. spaces
+        |> andThen
+            (\arg ->
+                --succeed (AvFloat arg)
+                succeed (AvFloat (arg |> Maybe.withDefault 0.0))
             )
 
 
 varValue : Parser ArgValue
 varValue =
-  succeed (\identity -> AvVar identity)
-    |= varValueHelp
+    succeed (\identity -> AvVar identity)
+        |= varValueHelp
+
 
 varValueHelp : Parser String
 varValueHelp =
-  variable
-    { start = Char.isLower
-    , inner = \c -> Char.isAlphaNum c || c == '_'
-    , reserved = Set.fromList [ "if", "then", "else", "elsif", "while" , "do", "end", "for", "case", "let", "fn", "return","break","continue"]
-    }
+    variable
+        { start = Char.isLower
+        , inner = \c -> Char.isAlphaNum c || c == '_'
+        , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
+        }
+
+
+
 ---------------------------------------------
 {--
 varValue : Context -> Parser ArgValue
@@ -1079,71 +1375,84 @@ argValuesTail  =
     , succeed []
     ]
 --}
-
 --argValues :  Parser (List ArgValue)
-argValues :  Parser (List Expr)
-argValues  =
-  succeed (::)
-    |. spaces
-    |= expression2
-    |. spaces
-    |= argValuesTail 
-    |> andThen
-            (\( arg ) ->
-                 succeed (arg)
-            )
 
---argValuesTail :  Parser (List ArgValue)
-argValuesTail :  Parser (List Expr)
-argValuesTail  =
-  oneOf
-    [ succeed (::)
-        |. symbol ","
+
+argValues : Parser (List Expr)
+argValues =
+    succeed (::)
         |. spaces
         |= expression2
         |. spaces
-        |= lazy (\_ ->  argValuesTail )
-    , succeed []
-    ]
+        |= argValuesTail
+        |> andThen
+            (\arg ->
+                succeed arg
+            )
+
+
+
+--argValuesTail :  Parser (List ArgValue)
+
+
+argValuesTail : Parser (List Expr)
+argValuesTail =
+    oneOf
+        [ succeed (::)
+            |. symbol ","
+            |. spaces
+            |= expression2
+            |. spaces
+            |= lazy (\_ -> argValuesTail)
+        , succeed []
+        ]
+
+
 
 --------------------------------------------- formalArg
 
+
 formalVarValue : Parser Expr
 formalVarValue =
-  succeed (\identity -> Variable identity)
-    |= formalVarValueHelp
+    succeed (\identity -> Variable identity)
+        |= formalVarValueHelp
+
 
 formalVarValueHelp : Parser String
 formalVarValueHelp =
-  variable
-    { start = Char.isLower
-    , inner = \c -> Char.isAlphaNum c || c == '_'
-    , reserved = Set.fromList [ "if", "then", "else", "elsif", "while" , "do", "end", "for", "case", "let", "fn", "return","break","continue"]
-    }
+    variable
+        { start = Char.isLower
+        , inner = \c -> Char.isAlphaNum c || c == '_'
+        , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
+        }
 
-formalArgValues :  Parser (List Expr)
-formalArgValues  =
-  succeed (::)
-    |. spaces
-    |= formalVarValue
-    |. spaces
-    |= formalArgValuesTail 
-    |> andThen
-            (\( arg ) ->
-                 succeed (arg)
-            )
 
-formalArgValuesTail :  Parser (List Expr)
-formalArgValuesTail  =
-  oneOf
-    [ succeed (::)
-        |. symbol ","
+formalArgValues : Parser (List Expr)
+formalArgValues =
+    succeed (::)
         |. spaces
         |= formalVarValue
         |. spaces
-        |= lazy (\_ ->  formalArgValuesTail )
-    , succeed []
-    ]
+        |= formalArgValuesTail
+        |> andThen
+            (\arg ->
+                succeed arg
+            )
+
+
+formalArgValuesTail : Parser (List Expr)
+formalArgValuesTail =
+    oneOf
+        [ succeed (::)
+            |. symbol ","
+            |. spaces
+            |= formalVarValue
+            |. spaces
+            |= lazy (\_ -> formalArgValuesTail)
+        , succeed []
+        ]
+
+
 
 --------------------------------------------- formalArg
 {--
@@ -1221,8 +1530,9 @@ func  =
             )
 --}
 
-func :  Parser Expr
-func  =
+
+func : Parser Expr
+func =
     succeed Tuple.pair
         |= backtrackable
             (variable
@@ -1232,24 +1542,26 @@ func  =
                 }
             )
         |. backtrackable (symbol "(")
-        |= argValues 
+        |= argValues
         |. symbol ")"
         |> andThen
             (\( name, args ) ->
                 --let
                 --  base = Array.fromList args
-
                 --in
                 --succeed (Function name  base)
-                succeed (Function name  args)
+                succeed (Function name args)
             )
+
+
 
 ----------------------------------------------------------
 -- FUNC def   end
 ----------------------------------------------------------
 
-array_index :  Parser Expr
-array_index  =
+
+array_index : Parser Expr
+array_index =
     succeed Tuple.pair
         --|= backtrackable
         --    (variable
@@ -1260,23 +1572,24 @@ array_index  =
         --    )
         --|. backtrackable (symbol "[")
         |= variable
-                { start = Char.isLower
-                --, inner = Char.isAlphaNum
-                --, reserved = Set.empty
-                , inner = \c -> Char.isAlphaNum c || c == '_'
-                , reserved = Set.fromList [ "if", "then", "else", "elsif","while" , "do", "end", "for", "case", "let" , "fn", "return","break","continue"]
-                }
-             
+            { start = Char.isLower
+
+            --, inner = Char.isAlphaNum
+            --, reserved = Set.empty
+            , inner = \c -> Char.isAlphaNum c || c == '_'
+            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
+            }
         |. symbol "["
         |= int
         |. symbol "]"
         |> andThen
             (\( name, index ) ->
-                succeed (ArrayIndex name  index)
+                succeed (ArrayIndex name index)
             )
 
-dict_lookup :  Parser Expr
-dict_lookup  =
+
+dict_lookup : Parser Expr
+dict_lookup =
     succeed Tuple.pair
         --|= backtrackable
         --    (variable
@@ -1287,29 +1600,30 @@ dict_lookup  =
         --    )
         --|. backtrackable (symbol "[")
         |= variable
-                { start = Char.isLower
-                --, inner = Char.isAlphaNum
-                --, reserved = Set.empty
-                , inner = \c -> Char.isAlphaNum c || c == '_'
-                , reserved = Set.fromList [ "if", "then", "else", "elsif","while" , "do", "end", "for", "case", "var", "def", "return","break","continue"]
-                }
-             
+            { start = Char.isLower
+
+            --, inner = Char.isAlphaNum
+            --, reserved = Set.empty
+            , inner = \c -> Char.isAlphaNum c || c == '_'
+            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "var", "def", "return", "break", "continue" ]
+            }
         |. symbol "."
         |= variable
-                { start = Char.isLower
-                --, inner = Char.isAlphaNum
-                --, reserved = Set.empty
-                , inner = \c -> Char.isAlphaNum c || c == '_'
-                , reserved = Set.fromList [ "if", "then", "else", "elsif", "while" , "do", "end", "for", "case", "let", "fn", "return","break","continue"]
-                }
-             
+            { start = Char.isLower
+
+            --, inner = Char.isAlphaNum
+            --, reserved = Set.empty
+            , inner = \c -> Char.isAlphaNum c || c == '_'
+            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
+            }
         |> andThen
             (\( name, key ) ->
-                succeed (DictLookUp name  key)
+                succeed (DictLookUp name key)
             )
 
-dict_index :  Parser Expr
-dict_index  =
+
+dict_index : Parser Expr
+dict_index =
     succeed Tuple.pair
         --|= backtrackable
         --    (variable
@@ -1320,28 +1634,33 @@ dict_index  =
         --    )
         --|. backtrackable (symbol "[")
         |= variable
-                { start = Char.isLower
-                --, inner = Char.isAlphaNum
-                --, reserved = Set.empty
-                , inner = \c -> Char.isAlphaNum c || c == '_'
-                , reserved = Set.fromList [ "if", "then", "else", "elsif","while" , "do", "end", "for", "case", "let", "fn", "return","break","continue"]
-                }
-             
+            { start = Char.isLower
+
+            --, inner = Char.isAlphaNum
+            --, reserved = Set.empty
+            , inner = \c -> Char.isAlphaNum c || c == '_'
+            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
+            }
         |. symbol "{"
         |= string
         |. symbol "}"
         |> andThen
             (\( name, key ) ->
                 let
-                   key_ = case key of
-                      --Just (String s) ->
-                      String s ->
-                            s
-                      _ ->
-                            "not"
+                    key_ =
+                        case key of
+                            --Just (String s) ->
+                            String s ->
+                                s
+
+                            _ ->
+                                "not"
                 in
-                succeed (DictIndex name  key_)
+                succeed (DictIndex name key_)
             )
+
+
+
 -- PARSER
 
 
@@ -1365,13 +1684,14 @@ like `0o17` and binary numbers like `0b01101100` are not allowed.
 -}
 digits : Parser Expr
 digits =
-  number
-    { int = Just Integer
-    , hex = Just Integer
-    , octal = Nothing
-    , binary = Nothing
-    , float = Just Floating
-    }
+    number
+        { int = Just Integer
+        , hex = Just Integer
+        , octal = Nothing
+        , binary = Nothing
+        , float = Just Floating
+        }
+
 
 bool : Parser Expr
 bool =
@@ -1391,135 +1711,146 @@ bool =
 
 term : Parser Expr
 term =
-  succeed (\a -> a)
-    |. spaces
-    |= oneOf
-         --[ digits
-         [ backtrackable string 
-         , backtrackable array
-         , backtrackable dict
-         , backtrackable func
-         , backtrackable array_index
-         , backtrackable dict_lookup
-         , backtrackable dict_index
-         , backtrackable default
-         , backtrackable typevar
-         , backtrackable digits
-         , bool
-         , succeed identity
-             |. symbol "("
-             |. spaces
-             |= lazy (\_ -> expression)
-             |. spaces
-             |. symbol ")"
-         ]
-    |. spaces
+    succeed (\a -> a)
+        |. spaces
+        |= oneOf
+            --[ digits
+            [ backtrackable string
+            , backtrackable array
+            , backtrackable dict
+            , backtrackable func
+            , backtrackable array_index
+            , backtrackable dict_lookup
+            , backtrackable dict_index
+            , backtrackable default
+            , backtrackable typevar
+            , backtrackable digits
+            , bool
+            , succeed identity
+                |. symbol "("
+                |. spaces
+                |= lazy (\_ -> expression)
+                |. spaces
+                |. symbol ")"
+            ]
+        |. spaces
 
 
 expression : Parser Expr
 expression =
-  term
-    |> andThen (expressionHelp [])
+    term
+        |> andThen (expressionHelp [])
 
 
-expressionHelp : List (Expr, Operator) -> Expr -> Parser Expr
+expressionHelp : List ( Expr, Operator ) -> Expr -> Parser Expr
 expressionHelp revOps expr =
-  oneOf
-    [ succeed Tuple.pair
-        |. spaces
-        |= operator
-        |. spaces
-        |= term
-        |> andThen (\(op, newExpr) -> expressionHelp ((expr,op) :: revOps) newExpr)
-    , lazy (\_ -> succeed (finalize revOps expr))
-    ]
+    oneOf
+        [ succeed Tuple.pair
+            |. spaces
+            |= operator
+            |. spaces
+            |= term
+            |> andThen (\( op, newExpr ) -> expressionHelp (( expr, op ) :: revOps) newExpr)
+        , lazy (\_ -> succeed (finalize revOps expr))
+        ]
+
+
 
 -----------------------------------------------------------
+
+
 term2 : Parser Expr
 term2 =
-  succeed (\a -> a)
-    |. spaces
-    |= oneOf
-         --[ digits
-         [ backtrackable string 
-         , backtrackable array
-         , backtrackable dict
-         --, backtrackable func
-         , backtrackable array_index
-         , backtrackable dict_lookup
-         , backtrackable dict_index
-         , backtrackable default
-         , backtrackable typevar
-         , backtrackable digits
-         , bool
-         , succeed identity
-             |. symbol "("
-             |. spaces
-             |= lazy (\_ -> expression2)
-             |. spaces
-             |. symbol ")"
-         ]
-    |. spaces
+    succeed (\a -> a)
+        |. spaces
+        |= oneOf
+            --[ digits
+            [ backtrackable string
+            , backtrackable array
+            , backtrackable dict
+
+            --, backtrackable func
+            , backtrackable array_index
+            , backtrackable dict_lookup
+            , backtrackable dict_index
+            , backtrackable default
+            , backtrackable typevar
+            , backtrackable digits
+            , bool
+            , succeed identity
+                |. symbol "("
+                |. spaces
+                |= lazy (\_ -> expression2)
+                |. spaces
+                |. symbol ")"
+            ]
+        |. spaces
 
 
 expression2 : Parser Expr
 expression2 =
-  term2
-    |> andThen (expressionHelp2 [])
+    term2
+        |> andThen (expressionHelp2 [])
 
 
-expressionHelp2 : List (Expr, Operator) -> Expr -> Parser Expr
+expressionHelp2 : List ( Expr, Operator ) -> Expr -> Parser Expr
 expressionHelp2 revOps expr =
-  oneOf
-    [ succeed Tuple.pair
-        |. spaces
-        |= operator
-        |. spaces
-        |= term2
-        |> andThen (\(op, newExpr) -> expressionHelp2 ((expr,op) :: revOps) newExpr)
-    , lazy (\_ -> succeed (finalize revOps expr))
-    ]
+    oneOf
+        [ succeed Tuple.pair
+            |. spaces
+            |= operator
+            |. spaces
+            |= term2
+            |> andThen (\( op, newExpr ) -> expressionHelp2 (( expr, op ) :: revOps) newExpr)
+        , lazy (\_ -> succeed (finalize revOps expr))
+        ]
+
+
 
 -----------------------------------------------------------
-type Operator = AddOp 
-              | SubOp
-              | MulOp
-              | DivOp
-              | Div2Op
-              | Div3Op
-              | AndOp
-              | OrOp
-              | LTOp
-              | GTOp
-              | LEOp
-              | GEOp
-              | EQOp
-              | NEOp
 
+
+type Operator
+    = AddOp
+    | SubOp
+    | MulOp
+    | DivOp
+    | Div2Op
+    | Div3Op
+    | AndOp
+    | OrOp
+    | LTOp
+    | GTOp
+    | LEOp
+    | GEOp
+    | EQOp
+    | NEOp
 
 
 operator : Parser Operator
 operator =
-  oneOf
-    [ map (\_ -> AddOp) (symbol "+")
-    , map (\_ -> SubOp) (symbol "-")
-    , map (\_ -> MulOp) (symbol "*")
-    --, map (\_ -> DivOp) ( backtrackable (symbol "//"))
-    --, map (\_ -> DivOp) ( backtrackable (symbol "/"))
-    , map (\_ -> Div2Op) (symbol "//")
-    , map (\_ -> DivOp)  (symbol "/")
-    , map (\_ -> Div3Op) (symbol "%")
-    , map (\_ -> AndOp) (symbol "&&")
-    , map (\_ -> OrOp)  (symbol "||")
-    --, map (\_ -> LTOp)  (symbol "<")
-    --, map (\_ -> GTOp)  (symbol ">")
-    , map (\_ -> LEOp)  (symbol "<=")
-    , map (\_ -> GEOp)  (symbol ">=")
-    , map (\_ -> LTOp)  (symbol "<")
-    , map (\_ -> GTOp)  (symbol ">")
-    , map (\_ -> EQOp)  (symbol "==")
-    , map (\_ -> NEOp)  (symbol "!=")
-    ]
+    oneOf
+        [ map (\_ -> AddOp) (symbol "+")
+        , map (\_ -> SubOp) (symbol "-")
+        , map (\_ -> MulOp) (symbol "*")
+
+        --, map (\_ -> DivOp) ( backtrackable (symbol "//"))
+        --, map (\_ -> DivOp) ( backtrackable (symbol "/"))
+        , map (\_ -> Div2Op) (symbol "//")
+        , map (\_ -> DivOp) (symbol "/")
+        , map (\_ -> Div3Op) (symbol "%")
+        , map (\_ -> AndOp) (symbol "&&")
+        , map (\_ -> OrOp) (symbol "||")
+
+        --, map (\_ -> LTOp)  (symbol "<")
+        --, map (\_ -> GTOp)  (symbol ">")
+        , map (\_ -> LEOp) (symbol "<=")
+        , map (\_ -> GEOp) (symbol ">=")
+        , map (\_ -> LTOp) (symbol "<")
+        , map (\_ -> GTOp) (symbol ">")
+        , map (\_ -> EQOp) (symbol "==")
+        , map (\_ -> NEOp) (symbol "!=")
+        ]
 
 
 {-| We only have `+` and `*` in this parser. If we see a `MulOp` we can
@@ -1529,144 +1860,252 @@ until all the multiplies have been taken care of.
 This code is kind of tricky, but it is a baseline for what you would need if
 you wanted to add `/`, `-`, `==`, `&&`, etc. which bring in more complex
 associativity and precedence rules.
+
 -}
-finalize : List (Expr, Operator) -> Expr -> Expr
+finalize : List ( Expr, Operator ) -> Expr -> Expr
 finalize revOps finalExpr =
-  case revOps of
-    [] ->
-      finalExpr
+    case revOps of
+        [] ->
+            finalExpr
 
-    (expr, MulOp) :: otherRevOps ->
-      finalize otherRevOps (Mul expr finalExpr)
-    (expr, DivOp) :: otherRevOps ->
-      finalize otherRevOps (Div expr finalExpr)
-    (expr, Div2Op) :: otherRevOps ->
-      finalize otherRevOps (Div2 expr finalExpr)
-    (expr, Div3Op) :: otherRevOps ->
-      finalize otherRevOps (Div3 expr finalExpr)
+        ( expr, MulOp ) :: otherRevOps ->
+            finalize otherRevOps (Mul expr finalExpr)
 
-    (expr, AddOp) :: otherRevOps ->
-      Add (finalize otherRevOps expr) finalExpr
-    (expr, SubOp) :: otherRevOps ->
-      Sub (finalize otherRevOps expr) finalExpr
+        ( expr, DivOp ) :: otherRevOps ->
+            finalize otherRevOps (Div expr finalExpr)
 
-    (expr, AndOp) :: otherRevOps ->
-      And (finalize otherRevOps expr) finalExpr
-    (expr, OrOp) :: otherRevOps ->
-      Or (finalize otherRevOps expr) finalExpr
+        ( expr, Div2Op ) :: otherRevOps ->
+            finalize otherRevOps (Div2 expr finalExpr)
 
-    (expr, LTOp) :: otherRevOps ->
-      LT (finalize otherRevOps expr) finalExpr
-    (expr, GTOp) :: otherRevOps ->
-      GT (finalize otherRevOps expr) finalExpr
-    (expr, LEOp) :: otherRevOps ->
-      LE (finalize otherRevOps expr) finalExpr
-    (expr, GEOp) :: otherRevOps ->
-      GE (finalize otherRevOps expr) finalExpr
-    (expr, EQOp) :: otherRevOps ->
-      EQ (finalize otherRevOps expr) finalExpr
-    (expr, NEOp) :: otherRevOps ->
-      NE (finalize otherRevOps expr) finalExpr
-----------------
+        ( expr, Div3Op ) :: otherRevOps ->
+            finalize otherRevOps (Div3 expr finalExpr)
 
-strjoin2 : Context -> Input -> OutVal
-strjoin2 context ar  =
-   let
-       a_ = case (Array.get 0 ar) of
-                  Just (AvString a)  ->
-                           a 
-                  Just (AvVar a)  ->
-                           let
-                              value = getConstant a context
-                              ans_ = case value of
-                                          Just v ->
-                                                 v
-                                          _ ->
-                                                 (OString " AvVar not_found")
-                              result = case ans_ of
-                                          OString v ->
-                                                 v
-                                          _ ->
-                                                 " AvVar not_found"
-                           in
-                           result
-                  _ ->
-                          ""
+        ( expr, AddOp ) :: otherRevOps ->
+            Add (finalize otherRevOps expr) finalExpr
 
-       b_ = case (Array.get 1 ar) of
-                  Just (AvString a)  ->
-                           a 
-                  Just (AvVar a)  ->
-                           let
-                              value = getConstant a context
-                              ans_ = case value of
-                                          Just v ->
-                                                 v
-                                          _ ->
-                                                 (OString " AvVar not_found")
-                              result = case ans_ of
-                                          OString v ->
-                                                 v
-                                          _ ->
-                                                 " AvVar not_found"
-                           in
-                           result
+        ( expr, SubOp ) :: otherRevOps ->
+            Sub (finalize otherRevOps expr) finalExpr
 
-                  _ ->
-                          ""
+        ( expr, AndOp ) :: otherRevOps ->
+            And (finalize otherRevOps expr) finalExpr
 
-       ans = a_ ++  b_
-   in
-   OString ans
+        ( expr, OrOp ) :: otherRevOps ->
+            Or (finalize otherRevOps expr) finalExpr
 
+        ( expr, LTOp ) :: otherRevOps ->
+            LT (finalize otherRevOps expr) finalExpr
+
+        ( expr, GTOp ) :: otherRevOps ->
+            GT (finalize otherRevOps expr) finalExpr
+
+        ( expr, LEOp ) :: otherRevOps ->
+            LE (finalize otherRevOps expr) finalExpr
+
+        ( expr, GEOp ) :: otherRevOps ->
+            GE (finalize otherRevOps expr) finalExpr
+
+        ( expr, EQOp ) :: otherRevOps ->
+            EQ (finalize otherRevOps expr) finalExpr
+
+        ( expr, NEOp ) :: otherRevOps ->
+            NE (finalize otherRevOps expr) finalExpr
+
+
+
+---------------------------------------------------------------------
+
+
+test_strjoin : Context -> Input -> OutVal
+test_strjoin context ar =
+    let
+        a_ =
+            case Array.get 0 ar of
+                Just (AvString a) ->
+                    a
+
+                Just (AvVar a) ->
+                    let
+                        value =
+                            getConstant a context
+
+                        ans_ =
+                            case value of
+                                Just v ->
+                                    v
+
+                                _ ->
+                                    OString " AvVar not_found"
+
+                        result =
+                            case ans_ of
+                                OString v ->
+                                    v
+
+                                _ ->
+                                    " AvVar not_found"
+                    in
+                    result
+
+                _ ->
+                    ""
+
+        b_ =
+            case Array.get 1 ar of
+                Just (AvString a) ->
+                    a
+
+                Just (AvVar a) ->
+                    let
+                        value =
+                            getConstant a context
+
+                        ans_ =
+                            case value of
+                                Just v ->
+                                    v
+
+                                _ ->
+                                    OString " AvVar not_found"
+
+                        result =
+                            case ans_ of
+                                OString v ->
+                                    v
+
+                                _ ->
+                                    " AvVar not_found"
+                    in
+                    result
+
+                _ ->
+                    ""
+
+        ans =
+            a_ ++ b_
+    in
+    OString ans
 
 
 exprexec : String -> String
 exprexec str =
- let
-   ast = parse str
-   result = case ast of
-        Err err ->
-           Debug.toString err
-        Ok expr ->
-           let
+    let
+        ast =
+            parse str
 
-             context = empty
-                      |> addConstant "test1" (OString "OKOK") 
-                      |> addConstant "test_flort" (OFloat 10.1) 
-                      |> addConstant "array_test" (OArray (Array.fromList 
-                                    [OFloat 1
-                                    ,OFloat 2
-                                    ,OFloat 3
-                                    ,OFloat 4
-                                    ,OFloat 5]) )
-                      |> addConstant "dict_test" (ODict (Dict.fromList 
-                                    [("a" , OFloat 1)
-                                    ,("b" , OFloat 2)
-                                    ,("c" , OFloat 3)
-                                    ,("d" , OFloat 4)
-                                    ,("e" , OFloat 5)]) )
-                      |> addFunction "strjoin" strjoin2
+        result =
+            case ast of
+                Err err ->
+                    Debug.toString err
 
-             userenv = {
-                         userFunctions = Dict.empty
-                        ,userEnv = Dict.empty
-                        }
+                Ok expr ->
+                    let
+                        context =
+                            empty
+                                |> addConstant "test1" (OString "OKOK")
+                                |> addConstant "test_flort" (OFloat 10.1)
+                                |> addConstant "array_test"
+                                    (OArray
+                                        (Array.fromList
+                                            [ OFloat 1
+                                            , OFloat 2
+                                            , OFloat 3
+                                            , OFloat 4
+                                            , OFloat 5
+                                            ]
+                                        )
+                                    )
+                                |> addConstant "dict_test"
+                                    (ODict
+                                        (Dict.fromList
+                                            [ ( "a", OFloat 1 )
+                                            , ( "b", OFloat 2 )
+                                            , ( "c", OFloat 3 )
+                                            , ( "d", OFloat 4 )
+                                            , ( "e", OFloat 5 )
+                                            ]
+                                        )
+                                    )
+                                |> addFunction "strjoin" test_strjoin
 
-             userfunc : userenv -> Context -> String -> (Array.Array ArgValue) -> OutVal
-             userfunc userenv_ context_ funcname input_args =
-                         OString "OK"
+                        userenv =
+                            { userFunctions = Dict.empty
+                            , userEnv = Dict.empty
+                            }
 
-             ans = evaluate userenv userfunc  context expr
-           in
-           Debug.toString ans
-             
- in
- result
+                        userfunc : userenv -> Context -> String -> Array.Array ArgValue -> OutVal
+                        userfunc userenv_ context_ funcname input_args =
+                            OString "OK"
 
+                        ans =
+                            evaluate userenv userfunc context expr
+                    in
+                    Debug.toString ans
+    in
+    result
+
+
+exprexec2 : String -> ExprResult String OutVal (String, (Array.Array ArgValue))
+exprexec2 str =
+    let
+        ast =
+            parse str
+
+        result =
+            case ast of
+                Err err ->
+                    --Debug.toString err
+                    --ExprErr "AST Error" (OString "err")
+                    ExprErr "AST Error" 
+
+                Ok expr ->
+                    let
+                        context =
+                            empty
+                                |> addConstant "test1" (OString "OKOK")
+                                |> addConstant "test_float" (OFloat 10.1)
+                                |> addConstant "array_test"
+                                    (OArray
+                                        (Array.fromList
+                                            [ OFloat 1
+                                            , OFloat 2
+                                            , OFloat 3
+                                            , OFloat 4
+                                            , OFloat 5
+                                            ]
+                                        )
+                                    )
+                                |> addConstant "dict_test"
+                                    (ODict
+                                        (Dict.fromList
+                                            [ ( "a", OFloat 1 )
+                                            , ( "b", OFloat 2 )
+                                            , ( "c", OFloat 3 )
+                                            , ( "d", OFloat 4 )
+                                            , ( "e", OFloat 5 )
+                                            ]
+                                        )
+                                    )
+                                |> addFunction "strjoin" test_strjoin
+
+                        userenv =
+                            { userFunctions = Dict.empty
+                            , userEnv = Dict.empty
+                            }
+
+                        userfunc : userenv -> Context -> String -> Array.Array ArgValue -> OutVal
+                        userfunc userenv_ context_ funcname input_args =
+                            OString "OK"
+
+                        ans =
+                            evaluate userenv userfunc context expr
+                    in
+                    --Debug.toString ans
+                    ans
+    in
+    result
 
 {--
-> import TestExpr exposing (..)
+> import Expr exposing (..)
 > exprexec " 1 + 3 + (7 //2) "
 "OFloat 7" : String
 > exprexec " 1 + 3 + (7 /2) "

@@ -1,1223 +1,1545 @@
-module Exec exposing (..)
+--module Exec exposing (..)
+module Exec exposing
+    ( stmt_parse
+    , userenvEmpty
+    , eval
+    )
 
 
-import Parser exposing (..)
-import Char
 import Array
+import Char
 import Dict
+import Expr exposing (..)
+import Parser exposing (..)
 import Set
-
-import Expr exposing(..)
 
 
 
 ---------------------------------------------------------------------
+
+
 type alias Name =
     String
 
+
 type UserEnv
-      = UserEnv
-         { userFunctions : Dict.Dict String (List Expr, List Statement)
-         , userEnv       : Dict.Dict String String
-         }
+    = UserEnv
+        { userFunctions : Dict.Dict String ( List Expr, List Statement )
+        , userEnv : Dict.Dict String String
+        }
+
 
 userenvEmpty : UserEnv
 userenvEmpty =
-       UserEnv
-         {
-          userFunctions = Dict.empty
-         ,userEnv = Dict.empty
-         }
+    UserEnv
+        { userFunctions = Dict.empty
+        , userEnv = Dict.empty
+        }
+
 
 type Statement
     = Var Name
-    | IfThen Expr (List Statement) 
+    | IfThen Expr (List Statement)
     | IfThenElse Expr (List Statement) (List Statement)
-    | IfThenElsIfThen Expr (List Statement) (List (Expr,(List Statement)))
-    | IfThenElsIfThenElse Expr (List Statement) (List (Expr,(List Statement))) (List Statement)
-    | Case        Expr  (List (Expr,(List Statement)))
-    | While Expr (List Statement) 
-    | For Expr Expr (List Statement) 
+    | IfThenElsIfThen Expr (List Statement) (List ( Expr, List Statement ))
+    | IfThenElsIfThenElse Expr (List Statement) (List ( Expr, List Statement )) (List Statement)
+    | Case Expr (List ( Expr, List Statement ))
+    | While Expr (List Statement)
+    | For Expr Expr (List Statement)
     | DefVar Expr Expr
     | DefFunc Expr (List Expr) (List Statement)
     | Assign Expr Expr
-    | Return Expr 
+    | Return Expr
     | Break
     | Continue
     | Blank
 
 
 stmt_parse script_name =
-   run script script_name
-   
+    run script script_name
+
+
+
 --init_context =
 --  empty
---     |> addFunction "strjoin" strjoin 
+--     |> addFunction "strjoin" strjoin
+
 
 script : Parser (List Statement)
 script =
-   statements
+    statements
+
 
 statements : Parser (List Statement)
 statements =
     loop [] statementsHelp
-     
+
+
 spaces : Parser ()
 spaces =
-  chompWhile (\c -> c == ' ' || c == '\n' || c == '\r')
-
+    chompWhile (\c -> c == ' ' || c == '\n' || c == '\u{000D}')
 
 
 spsWorkAround : Parser ()
 spsWorkAround =
-   loop 0 <| ifProgress <|
-   oneOf
-   [ lineCommentWorkAround "//"
-   , multiComment "/*" "*/" Nestable
-   , spaces
-   ]
+    loop 0 <|
+        ifProgress <|
+            oneOf
+                [ lineCommentWorkAround "//"
+                , multiComment "/*" "*/" Nestable
+                , spaces
+                ]
+
 
 lineCommentWorkAround : String -> Parser ()
 lineCommentWorkAround start =
     succeed () |. symbol start |. chompWhile (\c -> c /= '\n')
 
+
 ifProgress : Parser a -> Int -> Parser (Step Int ())
 ifProgress p offset =
-  succeed identity
-    |. p
-    |= getOffset
-    |> map (\newOffset -> if offset == newOffset then Done () else Loop newOffset)
+    succeed identity
+        |. p
+        |= getOffset
+        |> map
+            (\newOffset ->
+                if offset == newOffset then
+                    Done ()
 
+                else
+                    Loop newOffset
+            )
 
 
 statementsHelp : List Statement -> Parser (Step (List Statement) (List Statement))
 statementsHelp revStmts =
     oneOf
-      [ succeed (\stmt -> Loop (stmt :: revStmts))
-          |. spsWorkAround
-          |= statement
-          |. spsWorkAround
-          |. spaces
---          |. symbol ";"
---          |. spaces
-      , succeed ()
-          |> map (\_ -> Done (List.reverse revStmts))
-          --|> map (\_ -> Done ("--" ++ str ++ "--"))
-      ]
+        [ succeed (\stmt -> Loop (stmt :: revStmts))
+            |. spsWorkAround
+            |= statement
+            |. spsWorkAround
+            |. spaces
+
+        --          |. symbol ";"
+        --          |. spaces
+        , succeed ()
+            |> map (\_ -> Done (List.reverse revStmts))
+
+        --|> map (\_ -> Done ("--" ++ str ++ "--"))
+        ]
 
 
 statementsHelp2 : List Statement -> Parser (Step (List Statement) (List Statement))
 statementsHelp2 revStmts =
     oneOf
-      [ succeed (\stmt -> Loop (stmt :: revStmts))
-          |= statement
-          |. spaces
---          |. symbol ";"
---          |. spaces
-      , succeed ()
-          |> map (\_ -> Done (List.reverse revStmts))
-          --|> map (\_ -> Done ("--" ++ str ++ "--"))
-      ]
+        [ succeed (\stmt -> Loop (stmt :: revStmts))
+            |= statement
+            |. spaces
+
+        --          |. symbol ";"
+        --          |. spaces
+        , succeed ()
+            |> map (\_ -> Done (List.reverse revStmts))
+
+        --|> map (\_ -> Done ("--" ++ str ++ "--"))
+        ]
 
 
 typeName : Parser Statement
 typeName =
-     succeed Var
+    succeed Var
         |= variable
-           { start = Char.isLower
-           , inner = \c -> Char.isAlphaNum c || c == '_'
-           , reserved = Set.fromList [ "if", "then", "else","elsif", "end", "while", "do","in", "for", "case", "default" ,"let" ,"fn" , "return","break","continue"]
-           }
-
+            { start = Char.isLower
+            , inner = \c -> Char.isAlphaNum c || c == '_'
+            , reserved = Set.fromList [ "if", "then", "else", "elsif", "end", "while", "do", "in", "for", "case", "default", "let", "fn", "return", "break", "continue" ]
+            }
 
 
 typeVar : Parser Statement
 typeVar =
-     succeed Var
+    succeed Var
         |= variable
-          { start = Char.isLower
-          , inner = \c -> Char.isAlphaNum c || c == '_'
-          , reserved = Set.fromList [ "if", "then", "else","elsif","end", "while", "do","in", "for" , "case", "default" , "let", "fn", "return","break","continue"]
-          }
+            { start = Char.isLower
+            , inner = \c -> Char.isAlphaNum c || c == '_'
+            , reserved = Set.fromList [ "if", "then", "else", "elsif", "end", "while", "do", "in", "for", "case", "default", "let", "fn", "return", "break", "continue" ]
+            }
 
 
 statement : Parser Statement
 statement =
-   oneOf
-      [ defVarStatement
-      , defFuncStatement
-      , assignStatement
-      , backtrackable ifStatement   -- if then else
-      , backtrackable ifStatement3  -- if then elsif else
-      , backtrackable ifStatement4  -- if then elsif
-      , backtrackable ifStatement2  -- if then
-      , backtrackable caseStatement -- case
-      , whileStatement
-      , forStatement
-      , returnStatement
-      , breakStatement
-      , continueStatement
-      ]
+    oneOf
+        [ defVarStatement
+        , defFuncStatement
+        , assignStatement
+        , backtrackable ifStatement -- if then else
+        , backtrackable ifStatement3 -- if then elsif else
+        , backtrackable ifStatement4 -- if then elsif
+        , backtrackable ifStatement2 -- if then
+        , backtrackable caseStatement -- case
+        , whileStatement
+        , forStatement
+        , returnStatement
+        , breakStatement
+        , continueStatement
+        ]
 
 
-defVarStatement : Parser Statement 
+defVarStatement : Parser Statement
 defVarStatement =
-  succeed DefVar
-    |. spaces
-    |. keyword "let"
-    |. spaces
-    |= expression
-    |. spaces
-    |. symbol "="
-    |. spaces
-    --|= typeVar
-    |= expression
-    |. spaces
-    |. symbol ";"
+    succeed DefVar
+        |. spaces
+        |. keyword "let"
+        |. spaces
+        |= expression
+        |. spaces
+        |. symbol "="
+        |. spaces
+        --|= typeVar
+        |= expression
+        |. spaces
+        |. symbol ";"
 
-assignStatement : Parser Statement 
+
+assignStatement : Parser Statement
 assignStatement =
-  succeed Assign
-    |. spaces
-    --|= typeName
-    |= expression
-    |. spaces
-    |. symbol "="
-    |. spaces
-    --|= typeVar
-    |= expression
-    |. spaces
-    |. symbol ";"
+    succeed Assign
+        |. spaces
+        --|= typeName
+        |= expression
+        |. spaces
+        |. symbol "="
+        |. spaces
+        --|= typeVar
+        |= expression
+        |. spaces
+        |. symbol ";"
 
-returnStatement : Parser Statement 
+
+returnStatement : Parser Statement
 returnStatement =
-  succeed Return
-    |. spaces
-    |. keyword "return"
-    |. spaces
-    |= expression
-    |. spaces
-    |. symbol ";"
+    succeed Return
+        |. spaces
+        |. keyword "return"
+        |. spaces
+        |= expression
+        |. spaces
+        |. symbol ";"
 
-breakStatement : Parser Statement 
+
+breakStatement : Parser Statement
 breakStatement =
-  succeed Break
-    |. spaces
-    |. keyword "break"
-    |. spaces
-    |. symbol ";"
+    succeed Break
+        |. spaces
+        |. keyword "break"
+        |. spaces
+        |. symbol ";"
 
-continueStatement : Parser Statement 
+
+continueStatement : Parser Statement
 continueStatement =
-  succeed Continue
-    |. spaces
-    |. keyword "continue"
-    |. spaces
-    |. symbol ";"
+    succeed Continue
+        |. spaces
+        |. keyword "continue"
+        |. spaces
+        |. symbol ";"
 
-ifStatement : Parser Statement 
+
+ifStatement : Parser Statement
 ifStatement =
-  succeed  IfThenElse
-    |. spaces
-    |. keyword "if"
-    |. spaces
-    |= lazy (\_ -> expression)
-    |. spaces
-    |. keyword "{"
-    |. spaces
-    |= lazy (\_ -> statements)
-    |. spaces
-    |. keyword "}"
-    |. spaces
-    |. keyword "else"
-    |. spaces
-    |. keyword "{"
-    |. spaces
-    |= lazy (\_ -> statements)
-    |. spaces
-    |. keyword "}"
-    |. spaces
+    succeed IfThenElse
+        |. spaces
+        |. keyword "if"
+        |. spaces
+        |= lazy (\_ -> expression)
+        |. spaces
+        |. keyword "{"
+        |. spaces
+        |= lazy (\_ -> statements)
+        |. spaces
+        |. keyword "}"
+        |. spaces
+        |. keyword "else"
+        |. spaces
+        |. keyword "{"
+        |. spaces
+        |= lazy (\_ -> statements)
+        |. spaces
+        |. keyword "}"
+        |. spaces
 
-ifStatement2 : Parser Statement 
+
+ifStatement2 : Parser Statement
 ifStatement2 =
-  succeed  IfThen
-    |. spaces
-    |. keyword "if"
-    |. spaces
-    |= lazy (\_ -> expression)
-    |. spaces
-    |. keyword "{"
-    |. spaces
-    |= lazy (\_ -> statements)
-    |. spaces
-    |. keyword "}"
-    |. spaces
+    succeed IfThen
+        |. spaces
+        |. keyword "if"
+        |. spaces
+        |= lazy (\_ -> expression)
+        |. spaces
+        |. keyword "{"
+        |. spaces
+        |= lazy (\_ -> statements)
+        |. spaces
+        |. keyword "}"
+        |. spaces
 
 
-elsIfBlock :  Parser (Expr,(List Statement))
-elsIfBlock  =
-  succeed Tuple.pair
-    |. spaces
-    |. keyword "elsif"
-    |. spaces
-    |= lazy (\_ -> expression)
-    |. spaces
-    --|. keyword "then"
-    |. keyword "{"
-    |. spaces
-    |= lazy (\_ -> statements)
-    |. spaces
-    |. keyword "}"
-    |. spaces
-   -- |> andThen
-   --      (\( expr, stmts) ->
-   --           (expr, stmts)
-   --      )
+elsIfBlock : Parser ( Expr, List Statement )
+elsIfBlock =
+    succeed Tuple.pair
+        |. spaces
+        |. keyword "elsif"
+        |. spaces
+        |= lazy (\_ -> expression)
+        |. spaces
+        --|. keyword "then"
+        |. keyword "{"
+        |. spaces
+        |= lazy (\_ -> statements)
+        |. spaces
+        |. keyword "}"
+        |. spaces
 
-elsIfBlocks :  Parser (List (Expr,(List Statement)))
-elsIfBlocks  =
-  succeed (::)
-    |. spaces
-    |= lazy (\_ -> elsIfBlock)
-    |. spaces
-    |= elsIfBlocksTail 
-    |> andThen
-            (\( b ) ->
-                 succeed (b)
-            )
 
-elsIfBlocksTail :  Parser (List (Expr,(List Statement)))
-elsIfBlocksTail  =
-  oneOf
-    [ succeed (::)
+
+-- |> andThen
+--      (\( expr, stmts) ->
+--           (expr, stmts)
+--      )
+
+
+elsIfBlocks : Parser (List ( Expr, List Statement ))
+elsIfBlocks =
+    succeed (::)
         |. spaces
         |= lazy (\_ -> elsIfBlock)
         |. spaces
-        |= lazy (\_ ->  elsIfBlocksTail )
-    , succeed []
-    ]
-
-ifStatement3 : Parser Statement 
-ifStatement3 =
-  succeed  IfThenElsIfThenElse
-    |. spaces
-    |. keyword "if"
-    |. spaces
-    |= lazy (\_ -> expression)
-    |. spaces
-    --|. keyword "then"
-    |. keyword "{"
-    |. spaces
-    |= lazy (\_ -> statements)
-    |. spaces
-    |. keyword "}"
-    |. spaces
-    |= lazy (\_ -> elsIfBlocks)
-    --|. spaces
-    --|. keyword "}"
-    |. spaces
-    |. keyword "else"
-    |. spaces
-    |. keyword "{"
-    |. spaces
-    |= lazy (\_ -> statements)
-    |. spaces
-    --|. keyword "end"
-    |. keyword "}"
-    |. spaces
-
-ifStatement4 : Parser Statement 
-ifStatement4 =
-  succeed  IfThenElsIfThen
-    |. spaces
-    |. keyword "if"
-    |. spaces
-    |= lazy (\_ -> expression)
-    |. spaces
-    --|. keyword "then"
-    |. keyword "{"
-    |. spaces
-    |= lazy (\_ -> statements)
-    |. spaces
-    |. keyword "}"
-    |. spaces
-    |= lazy (\_ -> elsIfBlocks)
-    |. spaces
-    --|. keyword "end"
-    --|. keyword "}"
-    |. spaces
-
-caseStatement : Parser Statement 
-caseStatement =
-  succeed  Case
-    |. spaces
-    |. keyword "case"
-    |. spaces
-    |= lazy (\_ -> expression)
-    |. spaces
-    |. keyword "{"
-    |. spaces
-    |= lazy (\_ -> caseBlocks)
-    |. spaces
-    |. keyword "}"
-    |. spaces
-
-caseBlock :  Parser (Expr,(List Statement))
-caseBlock  =
-  succeed Tuple.pair
-    |. spaces
-    |= lazy (\_ -> expression)
-    |. spaces
-    |. symbol ":"
-    |. spaces
-    |= lazy (\_ -> statements)
-    |. spaces
-
-
-caseBlocks :  Parser (List (Expr,(List Statement)))
-caseBlocks  =
-  succeed (::)
-    |. spaces
-    |= lazy (\_ -> caseBlock)
-    |. spaces
-    |= caseBlocksTail 
-    |> andThen
-            (\( b ) ->
-                 succeed (b)
+        |= elsIfBlocksTail
+        |> andThen
+            (\b ->
+                succeed b
             )
 
-caseBlocksTail :  Parser (List (Expr,(List Statement)))
-caseBlocksTail  =
-  oneOf
-    [ succeed (::)
+
+elsIfBlocksTail : Parser (List ( Expr, List Statement ))
+elsIfBlocksTail =
+    oneOf
+        [ succeed (::)
+            |. spaces
+            |= lazy (\_ -> elsIfBlock)
+            |. spaces
+            |= lazy (\_ -> elsIfBlocksTail)
+        , succeed []
+        ]
+
+
+ifStatement3 : Parser Statement
+ifStatement3 =
+    succeed IfThenElsIfThenElse
+        |. spaces
+        |. keyword "if"
+        |. spaces
+        |= lazy (\_ -> expression)
+        |. spaces
+        --|. keyword "then"
+        |. keyword "{"
+        |. spaces
+        |= lazy (\_ -> statements)
+        |. spaces
+        |. keyword "}"
+        |. spaces
+        |= lazy (\_ -> elsIfBlocks)
+        --|. spaces
+        --|. keyword "}"
+        |. spaces
+        |. keyword "else"
+        |. spaces
+        |. keyword "{"
+        |. spaces
+        |= lazy (\_ -> statements)
+        |. spaces
+        --|. keyword "end"
+        |. keyword "}"
+        |. spaces
+
+
+ifStatement4 : Parser Statement
+ifStatement4 =
+    succeed IfThenElsIfThen
+        |. spaces
+        |. keyword "if"
+        |. spaces
+        |= lazy (\_ -> expression)
+        |. spaces
+        --|. keyword "then"
+        |. keyword "{"
+        |. spaces
+        |= lazy (\_ -> statements)
+        |. spaces
+        |. keyword "}"
+        |. spaces
+        |= lazy (\_ -> elsIfBlocks)
+        |. spaces
+        --|. keyword "end"
+        --|. keyword "}"
+        |. spaces
+
+
+caseStatement : Parser Statement
+caseStatement =
+    succeed Case
+        |. spaces
+        |. keyword "case"
+        |. spaces
+        |= lazy (\_ -> expression)
+        |. spaces
+        |. keyword "{"
+        |. spaces
+        |= lazy (\_ -> caseBlocks)
+        |. spaces
+        |. keyword "}"
+        |. spaces
+
+
+caseBlock : Parser ( Expr, List Statement )
+caseBlock =
+    succeed Tuple.pair
+        |. spaces
+        |= lazy (\_ -> expression)
+        |. spaces
+        |. symbol ":"
+        |. spaces
+        |= lazy (\_ -> statements)
+        |. spaces
+
+
+caseBlocks : Parser (List ( Expr, List Statement ))
+caseBlocks =
+    succeed (::)
         |. spaces
         |= lazy (\_ -> caseBlock)
         |. spaces
-        |= lazy (\_ ->  caseBlocksTail )
-    , succeed []
-    ]
+        |= caseBlocksTail
+        |> andThen
+            (\b ->
+                succeed b
+            )
 
-defFuncStatement : Parser Statement 
+
+caseBlocksTail : Parser (List ( Expr, List Statement ))
+caseBlocksTail =
+    oneOf
+        [ succeed (::)
+            |. spaces
+            |= lazy (\_ -> caseBlock)
+            |. spaces
+            |= lazy (\_ -> caseBlocksTail)
+        , succeed []
+        ]
+
+
+defFuncStatement : Parser Statement
 defFuncStatement =
-  succeed DefFunc 
-    |. spaces
-    |. keyword "fn"
-    |. spaces
-    --|= lazy (\_ -> typeVar)
-    --|= lazy (\_ -> expression)
-    --|= expression
-    |= typevar  -- func name
-    |. spaces
-    |. symbol "("
-    |. spaces
-    |= formalArgValues
-    |. spaces
-    |. symbol ")"
-    |. spaces
-    |. symbol "{"
-    |. spaces
-    |= lazy (\_ -> statements)
-    |. spaces
-    |. symbol "}"
-    |. spaces
+    succeed DefFunc
+        |. spaces
+        |. keyword "fn"
+        |. spaces
+        --|= lazy (\_ -> typeVar)
+        --|= lazy (\_ -> expression)
+        --|= expression
+        |= typevar
+        -- func name
+        |. spaces
+        |. symbol "("
+        |. spaces
+        |= formalArgValues
+        |. spaces
+        |. symbol ")"
+        |. spaces
+        |. symbol "{"
+        |. spaces
+        |= lazy (\_ -> statements)
+        |. spaces
+        |. symbol "}"
+        |. spaces
 
-whileStatement : Parser Statement 
+
+whileStatement : Parser Statement
 whileStatement =
-  succeed  While
-    |. spaces
-    |. keyword "while"
-    |. spaces
-    --|= lazy (\_ -> typeVar)
-    |= lazy (\_ -> expression)
-    |. spaces
-    |. symbol "{"
-    |. spaces
-    |= lazy (\_ -> statements)
-    |. spaces
-    |. symbol "}"
-    |. spaces
+    succeed While
+        |. spaces
+        |. keyword "while"
+        |. spaces
+        --|= lazy (\_ -> typeVar)
+        |= lazy (\_ -> expression)
+        |. spaces
+        |. symbol "{"
+        |. spaces
+        |= lazy (\_ -> statements)
+        |. spaces
+        |. symbol "}"
+        |. spaces
 
 
-forStatement : Parser Statement 
+forStatement : Parser Statement
 forStatement =
-  succeed  For
-    |. spaces
-    |. keyword "for"
-    |. spaces
-    --|= lazy (\_ -> typeVar)
-    |= lazy (\_ -> expression)
-    |. spaces
-    |. keyword "in"
-    |. spaces
-    --|= lazy (\_ -> typeVar)
-    |= lazy (\_ -> expression)
-    |. spaces
-    |. keyword "{"
-    |. spaces
-    |= lazy (\_ -> statements)
-    |. spaces
-    |. keyword "}"
-    |. spaces
+    succeed For
+        |. spaces
+        |. keyword "for"
+        |. spaces
+        --|= lazy (\_ -> typeVar)
+        |= lazy (\_ -> expression)
+        |. spaces
+        |. keyword "in"
+        |. spaces
+        --|= lazy (\_ -> typeVar)
+        |= lazy (\_ -> expression)
+        |. spaces
+        |. keyword "{"
+        |. spaces
+        |= lazy (\_ -> statements)
+        |. spaces
+        |. keyword "}"
+        |. spaces
+
+
 
 ------------------------------------------------------------------
 
-userFuncExec2_ : (List Expr) -> (List Statement) -> UserEnv -> (Array.Array ArgValue) -> OutVal
+
+userFuncExec2_ : List Expr -> List Statement -> UserEnv -> Array.Array ArgValue -> OutVal
 userFuncExec2_ args stmts userenv input_args =
-            --OString "OK"
-            let
-              r = case (Array.get 0 input_args) of
-                       Just (AvInt a)  -> 
-                                   a
-                       _ ->
-                             0
-            in
-            OString ( Debug.toString args)
+    --OString "OK"
+    let
+        r =
+            case Array.get 0 input_args of
+                Just (AvInt a) ->
+                    a
 
-userFuncExec2 : Context -> (List Expr) -> (List Statement) -> UserEnv -> (Array.Array ArgValue) -> OutVal
-userFuncExec2 (Context base_context) args stmts userenv input_args =
-            let
-              func index v =
-                  let
-                   name = case v of
-                       Variable n -> 
-                             n
-                       _ ->
-                             "__"
-
-                   value  = case (Array.get index input_args) of
-                       Just (AvInt a)  -> 
-                                   OFloat (toFloat a)
-                       Just (AvBool a)  -> 
-                                   OBool a
-                       Just (AvFloat a)  -> 
-                                   OFloat a
-                       Just (AvString a)  -> 
-                                   OString a
-                       Just (AvVar a)  -> 
-                                   let
-                                      --value_ = getConstant a context
-                                      value_ = getConstant a (Context base_context)
-                                   in
-                                   case value_ of
-                                          Just v_ ->
-                                                 v_
-                                                 --OFloat 3
-                                          _ ->
-                                                 (OString " AvVar not_found") 
-                       _ ->
-                             OFloat 3
-
-                  in
-                  (name, value)
-
-              new_args = List.indexedMap func args
-              context = empty
-              context__ = setFuncTop True context
-
-              func2 (name, v) context_ =
-                        addConstant name v context_
-
-
-              (Context context1) = List.foldl  func2 context__ new_args
-              context2 =
-                       Context
-                          { context1
-                              | functions = base_context.functions
-                          }                          
-
-
-              (userenv_2,ans) = eval userenv context2 stmts
-
-              ret = getConstant "_return_" ans
-
-            in
-            case ret of
-                Just r ->
-                         r
                 _ ->
-                         OString "NG"
+                    0
+    in
+    OString (Debug.toString args)
 
-userFuncExec : UserEnv -> Context -> String -> (Array.Array ArgValue) -> OutVal
+
+userFuncExec2 : Context -> List Expr -> List Statement -> UserEnv -> Array.Array ArgValue -> OutVal
+userFuncExec2 (Context base_context) args stmts userenv input_args =
+    let
+        func index v =
+            let
+                name =
+                    case v of
+                        Variable n ->
+                            n
+
+                        _ ->
+                            "__"
+
+                value =
+                    case Array.get index input_args of
+                        Just (AvInt a) ->
+                            OFloat (toFloat a)
+
+                        Just (AvBool a) ->
+                            OBool a
+
+                        Just (AvFloat a) ->
+                            OFloat a
+
+                        Just (AvString a) ->
+                            OString a
+
+                        Just (AvVar a) ->
+                            let
+                                --value_ = getConstant a context
+                                value_ =
+                                    getConstant a (Context base_context)
+                            in
+                            case value_ of
+                                Just v_ ->
+                                    v_
+
+                                --OFloat 3
+                                _ ->
+                                    OString " AvVar not_found"
+
+                        _ ->
+                            OFloat 3
+            in
+            ( name, value )
+
+        new_args =
+            List.indexedMap func args
+
+        context =
+            empty
+
+        context__ =
+            setFuncTop True context
+
+        func2 ( name, v ) context_ =
+            addConstant name v context_
+
+        (Context context1) =
+            List.foldl func2 context__ new_args
+
+        context2 =
+            Context
+                { context1
+                    | functions = base_context.functions
+                }
+
+        ( userenv_2, ans ) =
+            eval userenv context2 stmts
+
+        ret =
+            getConstant "_return_" ans
+    in
+    case ret of
+        Just r ->
+            r
+
+        _ ->
+            OString "NG"
+
+
+userFuncExec : UserEnv -> Context -> String -> Array.Array ArgValue -> OutVal
 userFuncExec userenv context funcname input_args =
-         let 
-          result = userDefFuncGet funcname userenv context
-         in
-         case result of
-               Ok (args, stmts) ->
-                    let
-                       r = userFuncExec2 context args stmts userenv input_args
-                    in
-                    r
-               Err a ->
-                    OString ("NOT FOUND:::" ++ funcname)
+    let
+        result =
+            userDefFuncGet funcname userenv context
+    in
+    case result of
+        Ok ( args, stmts ) ->
+            let
+                r =
+                    userFuncExec2 context args stmts userenv input_args
+            in
+            r
 
-    
+        Err a ->
+            OString ("NOT FOUND:::" ++ funcname)
 
 
-exec_evaluate :  UserEnv -> Context -> Expr ->  OutVal
-exec_evaluate  (UserEnv userenv) context expr =       
-     let
-       r = evaluate  (UserEnv userenv) userFuncExec context expr
-     in
+exec_evaluate : UserEnv -> Context -> Expr -> OutVal
+exec_evaluate (UserEnv userenv) context expr =
+    let
+        r =
+            evaluate (UserEnv userenv) userFuncExec context expr
+    in
     case r of
-         ExprOk a ->
-                a
+        ExprOk a ->
+            a
 
-         ExprNotFoundFunc (name, args) ->
-                userFuncExec (UserEnv userenv) context name args
+        ExprNotFoundFunc ( name, args ) ->
+            userFuncExec (UserEnv userenv) context name args
 
-         ExprErr a ->
-                OString a
-
-
-evalWhile : Expr -> (Array.Array Statement)  -> UserEnv -> Context -> (UserEnv,Context)
-evalWhile expr arr  userenv context =
-     let
-        expr_  = exec_evaluate userenv context expr
-     in
-     case expr_ of
-            OBool True ->  
-                 let
-                   (userenv_3,context_3) = evalStep  arr 0 userenv context
-                 in
-                 if isBreak context_3 then
-                   let
-                     context_4 = setBreak False context_3
-                   in
-                   (userenv_3, context_4)
-                 else
-                   evalWhile expr arr  userenv_3 context_3
-
-            OBool False -> 
-                 (userenv, context)
-            _ -> 
-                 (userenv, context)
+        ExprErr a ->
+            OString a
 
 
-evalForHelp : String -> Array.Array OutVal ->  (Array.Array Statement)  -> UserEnv -> Context -> (UserEnv,Context)
+evalWhile : Expr -> Array.Array Statement -> UserEnv -> Context -> ( UserEnv, Context )
+evalWhile expr arr userenv context =
+    let
+        expr_ =
+            exec_evaluate userenv context expr
+    in
+    case expr_ of
+        OBool True ->
+            let
+                ( userenv_3, context_3 ) =
+                    evalStep arr 0 userenv context
+            in
+            if isBreak context_3 then
+                let
+                    context_4 =
+                        setBreak False context_3
+                in
+                ( userenv_3, context_4 )
+
+            else
+                evalWhile expr arr userenv_3 context_3
+
+        OBool False ->
+            ( userenv, context )
+
+        _ ->
+            ( userenv, context )
+
+
+evalForHelp : String -> Array.Array OutVal -> Array.Array Statement -> UserEnv -> Context -> ( UserEnv, Context )
 evalForHelp name array stmt userenv context =
+    let
+        context_ =
+            case Array.get 0 array of
+                Just a ->
+                    setConstant name a context
+
+                _ ->
+                    context
+
+        userenv_context_3 =
+            evalStep stmt 0 userenv context_
+
+        array2 =
+            Array.slice 1 (Array.length array) array
+    in
+    if Array.length array2 > 0 then
         let
-          context_ =  case (Array.get 0 array) of
-                             Just a ->
-                               setConstant name  a context
-                             _ ->
-                               context
+            context_3 =
+                Tuple.second userenv_context_3
 
-          userenv_context_3 = evalStep  stmt 0 userenv context_
-
-          array2 = Array.slice 1 (Array.length array) array
+            userenv_3 =
+                Tuple.first userenv_context_3
         in
-        if (Array.length array2) > 0 then
-           let
-            context_3 = Tuple.second userenv_context_3
-            userenv_3 = Tuple.first  userenv_context_3
-           in
-           if isBreak context_3 then
-             let
-               context_4 = setBreak False context_3
-             in
-             (userenv_3, context_4)
-           else
-             evalForHelp name array2 stmt (Tuple.first userenv_context_3) (Tuple.second userenv_context_3)
+        if isBreak context_3 then
+            let
+                context_4 =
+                    setBreak False context_3
+            in
+            ( userenv_3, context_4 )
+
         else
-           userenv_context_3
+            evalForHelp name array2 stmt (Tuple.first userenv_context_3) (Tuple.second userenv_context_3)
 
-evalFor : Expr -> Expr -> (Array.Array Statement)  -> UserEnv -> Context -> (UserEnv, Context)
-evalFor val array stmt  userenv context =
-     let
-        val2 = case val of
-                  --OString a ->
-                  Variable a ->
-                          a
-                  _ ->
-                          "not"
-
-        array_ = exec_evaluate userenv context array
-     in
-     case array_ of
-            OArray a_ ->  
-                 evalForHelp val2 a_ stmt  userenv context
-
-            _ -> 
-                 (userenv, context)
+    else
+        userenv_context_3
 
 
-evalElsIfs :  (List (Expr,(List Statement))) -> (List Statement) -> UserEnv -> Context -> (UserEnv,Context)
-evalElsIfs   exprStmts  elseStmts  userenv context =
-         let
-             (expr, stmts ) = case (List.head exprStmts) of
-                                     Just a -> 
-                                              a
-                                     _ ->
-                                              (Bool False, [])
-             a_ = exec_evaluate userenv context expr
-             name = case a_ of
-                     OBool True ->  -- then
-                               "true"
-                     OBool False -> -- else
-                               "false"
-                     OString s ->
-                               "false"
-                     OFloat f ->
-                               "false"
-                     OArray _ ->
-                               "false"
-                     ODict _ ->
-                               "false"
+evalFor : Expr -> Expr -> Array.Array Statement -> UserEnv -> Context -> ( UserEnv, Context )
+evalFor val array stmt userenv context =
+    let
+        val2 =
+            case val of
+                --OString a ->
+                Variable a ->
+                    a
 
-             userenv_context_2 = case a_ of
-                     OBool True ->  -- then
-                              evalStep (Array.fromList stmts) 0 userenv context
-                     OBool False -> -- else
-                              let
-                                new_exprStmts = List.drop 1 exprStmts
-                              in
-                              if (List.length new_exprStmts) > 0 then
-                                 evalElsIfs   new_exprStmts  elseStmts userenv context
+                _ ->
+                    "not"
 
-                              else
-                                 evalStep (Array.fromList elseStmts) 0 userenv context
+        array_ =
+            exec_evaluate userenv context array
+    in
+    case array_ of
+        OArray a_ ->
+            evalForHelp val2 a_ stmt userenv context
 
-                     OString s ->
-                              (userenv, context)
-                     OFloat f ->
-                              (userenv, context)
-                     OArray _ ->
-                              (userenv, context)
-                     ODict _ ->
-                              (userenv, context)
-            in         
-            userenv_context_2 
+        _ ->
+            ( userenv, context )
 
 
-evalElsIfs2 :  (List (Expr,(List Statement))) ->  UserEnv -> Context -> (UserEnv,Context)
-evalElsIfs2   exprStmts  userenv  context =
-         let
-             (expr, stmts ) = case (List.head exprStmts) of
-                                     Just a -> 
-                                              a
-                                     _ ->
-                                              (Bool False, [])
-             a_ = exec_evaluate userenv context expr
-             name = case a_ of
-                     OBool True ->  -- then
-                               "true"
-                     OBool False -> -- else
-                               "false"
-                     OString s ->
-                               "false"
-                     OFloat f ->
-                               "false"
-                     OArray _ ->
-                               "false"
-                     ODict _ ->
-                               "false"
+evalElsIfs : List ( Expr, List Statement ) -> List Statement -> UserEnv -> Context -> ( UserEnv, Context )
+evalElsIfs exprStmts elseStmts userenv context =
+    let
+        ( expr, stmts ) =
+            case List.head exprStmts of
+                Just a ->
+                    a
 
-             userenv_context_2 = case a_ of
-                     OBool True ->  -- then
-                              evalStep (Array.fromList stmts) 0 userenv context
-                     OBool False -> -- else
-                              let
-                                new_exprStmts = List.drop 1 exprStmts
-                              in
-                              if (List.length new_exprStmts) > 0 then
-                                 evalElsIfs2   new_exprStmts  userenv context
+                _ ->
+                    ( Bool False, [] )
 
-                              else
-                                 (userenv, context)
+        a_ =
+            exec_evaluate userenv context expr
 
-                     OString s ->
-                             (userenv, context)
-                     OFloat f ->
-                             (userenv, context)
-                     OArray _ ->
-                             (userenv, context)
-                     ODict _ ->
-                             (userenv, context)
-            in         
-            userenv_context_2 
+        name =
+            case a_ of
+                OBool True ->
+                    -- then
+                    "true"
 
-evalCaseSwitch :  OutVal -> (List (Expr,(List Statement))) ->  UserEnv -> Context -> (UserEnv,Context)
-evalCaseSwitch   target exprStmts  userenv context =
-         let
-             (expr, stmts ) = case (List.head exprStmts) of
-                                     Just a -> 
-                                              a
-                                     _ ->
-                                              (Bool False, [])
-             a_ = exec_evaluate userenv context expr
+                OBool False ->
+                    -- else
+                    "false"
 
-             cond = case expr of 
-                         Default a ->
-                              True
-                         _ ->
-                              target == a_
+                OString s ->
+                    "false"
 
-             userenv_context_2 = case cond of
-                      True ->  
-                              evalStep (Array.fromList stmts) 0  userenv context
-                      False -> 
-                              let
-                                new_exprStmts = List.drop 1 exprStmts
-                              in
-                              if (List.length new_exprStmts) > 0 then
-                                 evalCaseSwitch target  new_exprStmts  userenv context
+                OFloat f ->
+                    "false"
 
-                              else
-                                 (userenv, context)
-            in         
-            userenv_context_2 
+                OArray _ ->
+                    "false"
+
+                ODict _ ->
+                    "false"
+
+        userenv_context_2 =
+            case a_ of
+                OBool True ->
+                    -- then
+                    evalStep (Array.fromList stmts) 0 userenv context
+
+                OBool False ->
+                    -- else
+                    let
+                        new_exprStmts =
+                            List.drop 1 exprStmts
+                    in
+                    if List.length new_exprStmts > 0 then
+                        evalElsIfs new_exprStmts elseStmts userenv context
+
+                    else
+                        evalStep (Array.fromList elseStmts) 0 userenv context
+
+                OString s ->
+                    ( userenv, context )
+
+                OFloat f ->
+                    ( userenv, context )
+
+                OArray _ ->
+                    ( userenv, context )
+
+                ODict _ ->
+                    ( userenv, context )
+    in
+    userenv_context_2
+
+
+evalElsIfs2 : List ( Expr, List Statement ) -> UserEnv -> Context -> ( UserEnv, Context )
+evalElsIfs2 exprStmts userenv context =
+    let
+        ( expr, stmts ) =
+            case List.head exprStmts of
+                Just a ->
+                    a
+
+                _ ->
+                    ( Bool False, [] )
+
+        a_ =
+            exec_evaluate userenv context expr
+
+        name =
+            case a_ of
+                OBool True ->
+                    -- then
+                    "true"
+
+                OBool False ->
+                    -- else
+                    "false"
+
+                OString s ->
+                    "false"
+
+                OFloat f ->
+                    "false"
+
+                OArray _ ->
+                    "false"
+
+                ODict _ ->
+                    "false"
+
+        userenv_context_2 =
+            case a_ of
+                OBool True ->
+                    -- then
+                    evalStep (Array.fromList stmts) 0 userenv context
+
+                OBool False ->
+                    -- else
+                    let
+                        new_exprStmts =
+                            List.drop 1 exprStmts
+                    in
+                    if List.length new_exprStmts > 0 then
+                        evalElsIfs2 new_exprStmts userenv context
+
+                    else
+                        ( userenv, context )
+
+                OString s ->
+                    ( userenv, context )
+
+                OFloat f ->
+                    ( userenv, context )
+
+                OArray _ ->
+                    ( userenv, context )
+
+                ODict _ ->
+                    ( userenv, context )
+    in
+    userenv_context_2
+
+
+evalCaseSwitch : OutVal -> List ( Expr, List Statement ) -> UserEnv -> Context -> ( UserEnv, Context )
+evalCaseSwitch target exprStmts userenv context =
+    let
+        ( expr, stmts ) =
+            case List.head exprStmts of
+                Just a ->
+                    a
+
+                _ ->
+                    ( Bool False, [] )
+
+        a_ =
+            exec_evaluate userenv context expr
+
+        cond =
+            case expr of
+                Default a ->
+                    True
+
+                _ ->
+                    target == a_
+
+        userenv_context_2 =
+            case cond of
+                True ->
+                    evalStep (Array.fromList stmts) 0 userenv context
+
+                False ->
+                    let
+                        new_exprStmts =
+                            List.drop 1 exprStmts
+                    in
+                    if List.length new_exprStmts > 0 then
+                        evalCaseSwitch target new_exprStmts userenv context
+
+                    else
+                        ( userenv, context )
+    in
+    userenv_context_2
+
+
 
 -----------------------------------
+
+
 isReturn : Context -> Bool
 isReturn context =
-           let
-            context_record = case context of
-                        Context con -> 
-                                 con
-           in
-           context_record.return
+    let
+        context_record =
+            case context of
+                Context con ->
+                    con
+    in
+    context_record.return
+
 
 setReturn : Bool -> Context -> Context
 setReturn bool context =
-           let
-            context_record = case context of
-                        Context con -> 
-                                 con
-           in
-            Context
-                 {
-                 context_record
-                      | return  = bool
-                 }
+    let
+        context_record =
+            case context of
+                Context con ->
+                    con
+    in
+    Context
+        { context_record
+            | return = bool
+        }
+
 
 isFuncTop : Context -> Bool
 isFuncTop context =
-           let
-            context_record = case context of
-                        Context con -> 
-                                 con
-           in
-           context_record.functop
+    let
+        context_record =
+            case context of
+                Context con ->
+                    con
+    in
+    context_record.functop
+
 
 setFuncTop : Bool -> Context -> Context
 setFuncTop bool context =
-           let
-            context_record = case context of
-                        Context con -> 
-                                 con
-           in
-            Context
-                 {
-                 context_record
-                      | functop  = bool
-                 }
+    let
+        context_record =
+            case context of
+                Context con ->
+                    con
+    in
+    Context
+        { context_record
+            | functop = bool
+        }
+
 
 isBreak : Context -> Bool
 isBreak context =
-           let
-            context_record = case context of
-                        Context con -> 
-                                 con
-           in
-           context_record.break
+    let
+        context_record =
+            case context of
+                Context con ->
+                    con
+    in
+    context_record.break
+
 
 setBreak : Bool -> Context -> Context
 setBreak bool context =
-           let
-            context_record = case context of
-                        Context con -> 
-                                 con
-           in
-            Context
-                 {
-                 context_record
-                      | break  = bool
-                 }
+    let
+        context_record =
+            case context of
+                Context con ->
+                    con
+    in
+    Context
+        { context_record
+            | break = bool
+        }
+
 
 isContinue : Context -> Bool
 isContinue context =
-           let
-            context_record = case context of
-                        Context con -> 
-                                 con
-           in
-           context_record.continue
+    let
+        context_record =
+            case context of
+                Context con ->
+                    con
+    in
+    context_record.continue
+
 
 setContinue bool context =
-           let
-            context_record = case context of
-                        Context con -> 
-                                 con
-           in
-            Context
-                 {
-                 context_record
-                      | continue  = bool
-                 }
+    let
+        context_record =
+            case context of
+                Context con ->
+                    con
+    in
+    Context
+        { context_record
+            | continue = bool
+        }
+
 
 scopePush : Context -> Context
 scopePush context =
-           let
-            context_record = case context of
-                        Context con -> 
-                                 con
-           in
-           if context_record.scope then
-                   let
-                     ct = dicPush context_record.constants
-                   in
-                   Context
-                     {
-                      context_record
-                       | constants  = ct
-                       }
-           else
-                   context
+    let
+        context_record =
+            case context of
+                Context con ->
+                    con
+    in
+    if context_record.scope then
+        let
+            ct =
+                dicPush context_record.constants
+        in
+        Context
+            { context_record
+                | constants = ct
+            }
+
+    else
+        context
+
 
 copyReturn : Context -> Context -> Context
 copyReturn top old =
-           let
-               ret = getConstant "_return_" old
+    let
+        ret =
+            getConstant "_return_" old
+    in
+    case ret of
+        Just r ->
+            addConstant "_return_" r top
 
-           in
-           case ret of
-                  Just r ->
-                        addConstant "_return_" r top
-                  _ ->
-                        top
+        _ ->
+            top
+
 
 scopePop : Context -> Context
 scopePop context =
-           let
-            context_record = case context of
-                        Context con -> 
-                                 con
-           in
-           if context_record.scope then
-                   let
-                     ct = dicPop context_record.constants
-                     new_context =  Context
-                               {
-                                context_record
-                                 | constants  = ct
-                                 }
+    let
+        context_record =
+            case context of
+                Context con ->
+                    con
+    in
+    if context_record.scope then
+        let
+            ct =
+                dicPop context_record.constants
 
-                   in
-                   copyReturn new_context context
-           else
-                   context
+            new_context =
+                Context
+                    { context_record
+                        | constants = ct
+                    }
+        in
+        copyReturn new_context context
+
+    else
+        context
+
+
 
 --userDefFuncDic = Dict.empty
 
-userDefFuncAdd : String -> (List Expr) -> (List Statement) -> UserEnv -> Context -> (UserEnv, Context)
-userDefFuncAdd name argvs stmts (UserEnv userenv ) (Context context) =
-      let
-          log_ = context.log ++ "[f]" ++ name ++ " "
-          userFunctions_= Dict.insert name (argvs, stmts)  userenv.userFunctions
-      in
-      (UserEnv
-         { userenv
-             | userFunctions = userFunctions_
-         }
-      ,Context
-         { context
-             | log = log_
-         }
-       )
-      
-userDefFuncGet : String -> UserEnv -> Context 
-     -> Result String  (List Expr , List Statement)
-userDefFuncGet name  (UserEnv userenv ) (Context context) =
-      let
-          log_ = context.log ++ "[f]" ++ name ++ " "
-          result =  Dict.get name   userenv.userFunctions
 
-      in
-      case result of
-          Just a ->
-                Ok a
-          _ ->
-                Err ("..NOT FOUND:" ++ name)
-
-
-evalStep : (Array.Array Statement) -> Int -> UserEnv -> Context -> (UserEnv, Context)
-evalStep arr pos userenv context =
+userDefFuncAdd : String -> List Expr -> List Statement -> UserEnv -> Context -> ( UserEnv, Context )
+userDefFuncAdd name argvs stmts (UserEnv userenv) (Context context) =
     let
-      _ = Debug.log (Debug.toString pos)
-      userenv_context_pair = case (Array.get pos arr) of
-        Just (DefVar a b) ->
-            let
-               b_ = exec_evaluate userenv context b
-               name = case a of
-                     Variable n ->
-                               n
-                     _ ->
-                               "undef"
-            in         
-            (userenv, newConstant name b_ context  )
+        log_ =
+            context.log ++ "[f]" ++ name ++ " "
 
-        Just (DefFunc a b c) ->
-            let
-               name = case a of
-                     Variable n ->
-                               n
-                     _ ->
-                               "undef"
-            in         
-            userDefFuncAdd name b c userenv context
-
-        Just (Assign a b) ->
-            let
-               b_ = exec_evaluate userenv context b
-               name = case a of
-                     Variable n ->
-                               n
-                     _ ->
-                               "undef"
-            in         
-            (userenv, (setConstant name b_  context)  )
-
-        Just (Return a ) ->
-            let
-               a_ = exec_evaluate userenv context a
-               context_ = setReturn True context
-            in         
-            (userenv, (addConstant "_return_" a_  context_)  )
-
-        Just (Break  ) ->
-            let
-               context_ = setBreak True context 
-            in         
-            (userenv,  context_ )
-
-        Just (Continue  ) ->
-            let
-               context_ = setContinue True context 
-            in         
-            (userenv,  context_ )
-
-        Just (IfThenElse a b c) ->
-            let
-               a_ = exec_evaluate userenv context a
-               name = case a_ of
-                     OBool True ->  -- then
-                               "true"
-                     OBool False -> -- else
-                               "false"
-                     OString s ->
-                               "false"
-                     OFloat f ->
-                               "false"
-                     OArray _ ->
-                               "false"
-                     ODict _ ->
-                               "false"
-               context_1 = scopePush context
-               (userenv_2,context_2) = case a_ of
-                     OBool True ->  -- then
-                              evalStep (Array.fromList b) 0 userenv context_1
-                     OBool False -> -- else
-                              evalStep (Array.fromList c) 0 userenv context_1
-                     OString s ->
-                              (userenv, context_1)
-                     OFloat f ->
-                              (userenv, context_1)
-                     OArray _ ->
-                              (userenv, context_1)
-                     ODict _ ->
-                              (userenv, context_1)
+        userFunctions_ =
+            Dict.insert name ( argvs, stmts ) userenv.userFunctions
+    in
+    ( UserEnv
+        { userenv
+            | userFunctions = userFunctions_
+        }
+    , Context
+        { context
+            | log = log_
+        }
+    )
 
 
-               context_3 = scopePop context_2
-            in         
-            (userenv_2, context_3 )
+userDefFuncGet :
+    String
+    -> UserEnv
+    -> Context
+    -> Result String ( List Expr, List Statement )
+userDefFuncGet name (UserEnv userenv) (Context context) =
+    let
+        log_ =
+            context.log ++ "[f]" ++ name ++ " "
 
-
-        Just (IfThen a b ) ->
-            let
-               a_ = exec_evaluate userenv context a
-               name = case a_ of
-                     OBool True ->  -- then
-                               "true"
-                     OBool False -> -- else
-                               "false"
-                     OString s ->
-                               "false"
-                     OFloat f ->
-                               "false"
-                     OArray _ ->
-                               "false"
-                     ODict _ ->
-                               "false"
-
-               context_1 = scopePush context
-               (userenv_2,context_2) = case a_ of
-                     OBool True ->  -- then
-                              evalStep (Array.fromList b) 0 userenv context_1
-                     OBool False -> -- else
-                              (userenv, context_1)
-                     OString s ->
-                              (userenv, context_1)
-                     OFloat f ->
-                              (userenv, context_1)
-                     OArray _ ->
-                              (userenv, context_1)
-                     ODict _ ->
-                              (userenv, context_1)
-               context_3 = scopePop context_2
-            in         
-            (userenv_2, context_3 )
-
-        Just (IfThenElsIfThenElse a b c d) ->
-            let
-               a_ = exec_evaluate userenv context a
-               name = case a_ of
-                     OBool True ->  -- then
-                               "true"
-                     OBool False -> -- else
-                               "false"
-                     OString s ->
-                               "false"
-                     OFloat f ->
-                               "false"
-                     OArray _ ->
-                               "false"
-                     ODict _ ->
-                               "false"
-
-               context_1 = scopePush context
-               (userenv_2,context_2) = case a_ of
-                     OBool True ->  -- then
-                              evalStep (Array.fromList b) 0 userenv context_1
-                     OBool False -> -- else
-                              evalElsIfs c d userenv context_1
-                     OString s ->
-                              (userenv, context_1)
-                     OFloat f ->
-                              (userenv, context_1)
-                     OArray _ ->
-                              (userenv, context_1)
-                     ODict _ ->
-                              (userenv, context_1)
-               context_3 = scopePop context_2
-            in         
-            (userenv_2, context_3 )
-
-        Just (IfThenElsIfThen a b c ) ->
-            let
-               a_ = exec_evaluate userenv context a
-               name = case a_ of
-                     OBool True ->  -- then
-                               "true"
-                     OBool False -> -- else
-                               "false"
-                     OString s ->
-                               "false"
-                     OFloat f ->
-                               "false"
-                     OArray _ ->
-                               "false"
-                     ODict _ ->
-                               "false"
-
-               context_1 = scopePush context
-               (userenv_2,context_2) = case a_ of
-                     OBool True ->  -- then
-                              evalStep (Array.fromList b) 0 userenv context_1
-                     OBool False -> -- else
-                              evalElsIfs2 c  userenv context_1
-                     OString s ->
-                              (userenv,context_1)
-                     OFloat f ->
-                              (userenv,context_1)
-                     OArray _ ->
-                              (userenv,context_1)
-                     ODict _ ->
-                              (userenv,context_1)
-               context_3 = scopePop context_2
-            in         
-            (userenv_2, context_3 )
-
-        Just (Case a b  ) ->
-            let
-               a_ = exec_evaluate userenv context a
-               name = case a_ of
-                     OBool True ->  -- then
-                               "true"
-                     OBool False -> -- else
-                               "false"
-                     OString s ->
-                               "false"
-                     OFloat f ->
-                               "false"
-                     OArray _ ->
-                               "false"
-                     ODict _ ->
-                               "false"
-
-               context_1 = scopePush context
-               (userenv_2,context_2) = evalCaseSwitch a_ b  userenv context_1
-               context_3 = scopePop context_2
-
-            in         
-            (userenv_2, context_3 )
-
-        Just (While a b ) ->
-            let
-               context_1 = scopePush context
-               (userenv_2,context_2) = evalWhile a (Array.fromList b) userenv context_1
-               context_3 = scopePop context_2
-            in         
-            (userenv_2, context_3 )
-
-
-        Just (For a b c) ->
-            let
-               context_1 = scopePush context
-               (userenv_2,context_2) = evalFor a b (Array.fromList c) userenv context_1
-               context_3 = scopePop context_2
-            in         
-            (userenv_2, context_3 )
+        result =
+            Dict.get name userenv.userFunctions
+    in
+    case result of
+        Just a ->
+            Ok a
 
         _ ->
-            (userenv,context)
+            Err ("..NOT FOUND:" ++ name)
+
+
+evalStep : Array.Array Statement -> Int -> UserEnv -> Context -> ( UserEnv, Context )
+evalStep arr pos userenv context =
+    let
+        _ =
+            Debug.log (Debug.toString pos)
+
+        userenv_context_pair =
+            case Array.get pos arr of
+                Just (DefVar a b) ->
+                    let
+                        b_ =
+                            exec_evaluate userenv context b
+
+                        name =
+                            case a of
+                                Variable n ->
+                                    n
+
+                                _ ->
+                                    "undef"
+                    in
+                    ( userenv, newConstant name b_ context )
+
+                Just (DefFunc a b c) ->
+                    let
+                        name =
+                            case a of
+                                Variable n ->
+                                    n
+
+                                _ ->
+                                    "undef"
+                    in
+                    userDefFuncAdd name b c userenv context
+
+                Just (Assign a b) ->
+                    let
+                        b_ =
+                            exec_evaluate userenv context b
+
+                        name =
+                            case a of
+                                Variable n ->
+                                    n
+
+                                _ ->
+                                    "undef"
+                    in
+                    ( userenv, setConstant name b_ context )
+
+                Just (Return a) ->
+                    let
+                        a_ =
+                            exec_evaluate userenv context a
+
+                        context_ =
+                            setReturn True context
+                    in
+                    ( userenv, addConstant "_return_" a_ context_ )
+
+                Just Break ->
+                    let
+                        context_ =
+                            setBreak True context
+                    in
+                    ( userenv, context_ )
+
+                Just Continue ->
+                    let
+                        context_ =
+                            setContinue True context
+                    in
+                    ( userenv, context_ )
+
+                Just (IfThenElse a b c) ->
+                    let
+                        a_ =
+                            exec_evaluate userenv context a
+
+                        name =
+                            case a_ of
+                                OBool True ->
+                                    -- then
+                                    "true"
+
+                                OBool False ->
+                                    -- else
+                                    "false"
+
+                                OString s ->
+                                    "false"
+
+                                OFloat f ->
+                                    "false"
+
+                                OArray _ ->
+                                    "false"
+
+                                ODict _ ->
+                                    "false"
+
+                        context_1 =
+                            scopePush context
+
+                        ( userenv_2, context_2 ) =
+                            case a_ of
+                                OBool True ->
+                                    -- then
+                                    evalStep (Array.fromList b) 0 userenv context_1
+
+                                OBool False ->
+                                    -- else
+                                    evalStep (Array.fromList c) 0 userenv context_1
+
+                                OString s ->
+                                    ( userenv, context_1 )
+
+                                OFloat f ->
+                                    ( userenv, context_1 )
+
+                                OArray _ ->
+                                    ( userenv, context_1 )
+
+                                ODict _ ->
+                                    ( userenv, context_1 )
+
+                        context_3 =
+                            scopePop context_2
+                    in
+                    ( userenv_2, context_3 )
+
+                Just (IfThen a b) ->
+                    let
+                        a_ =
+                            exec_evaluate userenv context a
+
+                        name =
+                            case a_ of
+                                OBool True ->
+                                    -- then
+                                    "true"
+
+                                OBool False ->
+                                    -- else
+                                    "false"
+
+                                OString s ->
+                                    "false"
+
+                                OFloat f ->
+                                    "false"
+
+                                OArray _ ->
+                                    "false"
+
+                                ODict _ ->
+                                    "false"
+
+                        context_1 =
+                            scopePush context
+
+                        ( userenv_2, context_2 ) =
+                            case a_ of
+                                OBool True ->
+                                    -- then
+                                    evalStep (Array.fromList b) 0 userenv context_1
+
+                                OBool False ->
+                                    -- else
+                                    ( userenv, context_1 )
+
+                                OString s ->
+                                    ( userenv, context_1 )
+
+                                OFloat f ->
+                                    ( userenv, context_1 )
+
+                                OArray _ ->
+                                    ( userenv, context_1 )
+
+                                ODict _ ->
+                                    ( userenv, context_1 )
+
+                        context_3 =
+                            scopePop context_2
+                    in
+                    ( userenv_2, context_3 )
+
+                Just (IfThenElsIfThenElse a b c d) ->
+                    let
+                        a_ =
+                            exec_evaluate userenv context a
+
+                        name =
+                            case a_ of
+                                OBool True ->
+                                    -- then
+                                    "true"
+
+                                OBool False ->
+                                    -- else
+                                    "false"
+
+                                OString s ->
+                                    "false"
+
+                                OFloat f ->
+                                    "false"
+
+                                OArray _ ->
+                                    "false"
+
+                                ODict _ ->
+                                    "false"
+
+                        context_1 =
+                            scopePush context
+
+                        ( userenv_2, context_2 ) =
+                            case a_ of
+                                OBool True ->
+                                    -- then
+                                    evalStep (Array.fromList b) 0 userenv context_1
+
+                                OBool False ->
+                                    -- else
+                                    evalElsIfs c d userenv context_1
+
+                                OString s ->
+                                    ( userenv, context_1 )
+
+                                OFloat f ->
+                                    ( userenv, context_1 )
+
+                                OArray _ ->
+                                    ( userenv, context_1 )
+
+                                ODict _ ->
+                                    ( userenv, context_1 )
+
+                        context_3 =
+                            scopePop context_2
+                    in
+                    ( userenv_2, context_3 )
+
+                Just (IfThenElsIfThen a b c) ->
+                    let
+                        a_ =
+                            exec_evaluate userenv context a
+
+                        name =
+                            case a_ of
+                                OBool True ->
+                                    -- then
+                                    "true"
+
+                                OBool False ->
+                                    -- else
+                                    "false"
+
+                                OString s ->
+                                    "false"
+
+                                OFloat f ->
+                                    "false"
+
+                                OArray _ ->
+                                    "false"
+
+                                ODict _ ->
+                                    "false"
+
+                        context_1 =
+                            scopePush context
+
+                        ( userenv_2, context_2 ) =
+                            case a_ of
+                                OBool True ->
+                                    -- then
+                                    evalStep (Array.fromList b) 0 userenv context_1
+
+                                OBool False ->
+                                    -- else
+                                    evalElsIfs2 c userenv context_1
+
+                                OString s ->
+                                    ( userenv, context_1 )
+
+                                OFloat f ->
+                                    ( userenv, context_1 )
+
+                                OArray _ ->
+                                    ( userenv, context_1 )
+
+                                ODict _ ->
+                                    ( userenv, context_1 )
+
+                        context_3 =
+                            scopePop context_2
+                    in
+                    ( userenv_2, context_3 )
+
+                Just (Case a b) ->
+                    let
+                        a_ =
+                            exec_evaluate userenv context a
+
+                        name =
+                            case a_ of
+                                OBool True ->
+                                    -- then
+                                    "true"
+
+                                OBool False ->
+                                    -- else
+                                    "false"
+
+                                OString s ->
+                                    "false"
+
+                                OFloat f ->
+                                    "false"
+
+                                OArray _ ->
+                                    "false"
+
+                                ODict _ ->
+                                    "false"
+
+                        context_1 =
+                            scopePush context
+
+                        ( userenv_2, context_2 ) =
+                            evalCaseSwitch a_ b userenv context_1
+
+                        context_3 =
+                            scopePop context_2
+                    in
+                    ( userenv_2, context_3 )
+
+                Just (While a b) ->
+                    let
+                        context_1 =
+                            scopePush context
+
+                        ( userenv_2, context_2 ) =
+                            evalWhile a (Array.fromList b) userenv context_1
+
+                        context_3 =
+                            scopePop context_2
+                    in
+                    ( userenv_2, context_3 )
+
+                Just (For a b c) ->
+                    let
+                        context_1 =
+                            scopePush context
+
+                        ( userenv_2, context_2 ) =
+                            evalFor a b (Array.fromList c) userenv context_1
+
+                        context_3 =
+                            scopePop context_2
+                    in
+                    ( userenv_2, context_3 )
+
+                _ ->
+                    ( userenv, context )
     in
     if Array.length arr <= pos then
-       userenv_context_pair
+        userenv_context_pair
 
     else
-       let
-         context__ = Tuple.second userenv_context_pair
-       in
-       if isBreak context__ || isReturn context__ then
-          userenv_context_pair
-       else
-          if isContinue context__ then
-             userenv_context_pair
-          else
-             evalStep arr (pos + 1) (Tuple.first userenv_context_pair) (Tuple.second userenv_context_pair)
+        let
+            context__ =
+                Tuple.second userenv_context_pair
+        in
+        if isBreak context__ || isReturn context__ then
+            userenv_context_pair
+
+        else if isContinue context__ then
+            userenv_context_pair
+
+        else
+            evalStep arr (pos + 1) (Tuple.first userenv_context_pair) (Tuple.second userenv_context_pair)
+
+
 
 ----------------------------------------------------------
-userFuncReg : UserEnv -> Context -> List Statement -> (UserEnv, Context)
+
+
+userFuncReg : UserEnv -> Context -> List Statement -> ( UserEnv, Context )
 userFuncReg userenv context stmts =
-      --OString "EVAL"
+    --OString "EVAL"
     let
-      _ = Debug.log (Debug.toString stmts)
-      arr = Array.fromList stmts
-      userenv_context_ = evalStep arr 0 userenv context
+        _ =
+            Debug.log (Debug.toString stmts)
+
+        arr =
+            Array.fromList stmts
+
+        userenv_context_ =
+            evalStep arr 0 userenv context
     in
-      userenv_context_
+    userenv_context_
 
 
-eval : UserEnv -> Context -> List Statement -> (UserEnv, Context)
+eval : UserEnv -> Context -> List Statement -> ( UserEnv, Context )
 eval userenv context stmts =
     let
-      _ = Debug.log (Debug.toString stmts)
-      arr = Array.fromList stmts
-      userenv_context_ = evalStep arr 0 userenv context
+        _ =
+            Debug.log (Debug.toString stmts)
+
+        arr =
+            Array.fromList stmts
+
+        userenv_context_ =
+            evalStep arr 0 userenv context
     in
-      userenv_context_
+    userenv_context_
+
+
+
 ---------------------------------------------------
 {--
 exec2 script_name =
