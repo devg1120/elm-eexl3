@@ -6,7 +6,7 @@ import Dict
 
 
 ---------------------------------------------------------------------
-{--
+
 
 test_strjoin : Context -> Input -> OutVal
 test_strjoin context ar =
@@ -136,7 +136,67 @@ exprexec str =
     in
     result
 
---}
+
+exprexec2 : String -> ExprResult String OutVal (String, (Array.Array ArgValue))
+exprexec2 str =
+    let
+        ast =
+            parse str
+
+        result =
+            case ast of
+                Err err ->
+                    --Debug.toString err
+                    --ExprErr "AST Error" (OString "err")
+                    ExprErr "AST Error" 
+
+                Ok expr ->
+                    let
+                        context =
+                            empty
+                                |> addConstant "test1" (OString "OKOK")
+                                |> addConstant "test_float" (OFloat 10.1)
+                                |> addConstant "array_test"
+                                    (OArray
+                                        (Array.fromList
+                                            [ OFloat 1
+                                            , OFloat 2
+                                            , OFloat 3
+                                            , OFloat 4
+                                            , OFloat 5
+                                            ]
+                                        )
+                                    )
+                                |> addConstant "dict_test"
+                                    (ODict
+                                        (Dict.fromList
+                                            [ ( "a", OFloat 1 )
+                                            , ( "b", OFloat 2 )
+                                            , ( "c", OFloat 3 )
+                                            , ( "d", OFloat 4 )
+                                            , ( "e", OFloat 5 )
+                                            ]
+                                        )
+                                    )
+                                |> addFunction "strjoin" test_strjoin
+
+                        userenv =
+                            { userFunctions = Dict.empty
+                            , userEnv = Dict.empty
+                            }
+
+                        userfunc : userenv -> Context -> String -> Array.Array ArgValue -> OutVal
+                        userfunc userenv_ context_ funcname input_args =
+                            OString "OK"
+
+                        ans =
+                            evaluate userenv userfunc context expr
+                    in
+                    --Debug.toString ans
+                    ans
+    in
+    result
+
 
 test_check expr result =
      let
@@ -159,6 +219,7 @@ testfunc entry_  =
           result_ = Tuple.second entry_
        in
        test_check expr result_
+
 ----------------------------------------
 {--
 test expr result_ arr =
@@ -214,9 +275,14 @@ test_list2 = Array.fromList [  -- array
    ,( " array_test  ", 
         OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3,OFloat 4,OFloat 5])   )
 
-   ,( " array_test[0]  ", 
-        OFloat 1   )
+   ,( " array_test[1]  ", 
+        OFloat 2   )
 
+   ,( " [ 1,2,3] + [4,5] " ,
+        OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3,OFloat 4,OFloat 5])  )
+
+   ,( " [ \"a\", \"b\"] + [\"c\", \"d\"] " ,
+        OArray (Array.fromList [OString "a", OString "b", OString "c", OString "d"])  )
    ]
 
 test_list3 = Array.fromList [  -- dict

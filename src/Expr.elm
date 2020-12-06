@@ -19,8 +19,9 @@ module Expr exposing
     , newConstant
     , setConstant
     , typevar
-    , exprexec  -- UNIT TEST
-    , exprexec2 -- UNIT TEST
+    , parse
+--    , exprexec  -- UNIT TEST
+--    , exprexec2 -- UNIT TEST
     )
 
 import Array
@@ -170,20 +171,6 @@ dicSet name value stackdic =
 
 
 
-{--
-dicSet : String -> OutVal -> Stack.Stack (Dict.Dict String OutVal) -> Stack.Stack (Dict.Dict String OutVal)
-dicSet name value stackdic =
-      let
-       result = dicSetUpdate name value stackdic 
-      in
-      case result of
-           Ok a ->
-                a
-           Err a ->
-                stackdic
---}
-
-
 dicSetNewLocal : String -> OutVal -> Stack.Stack (Dict.Dict String OutVal) -> Stack.Stack (Dict.Dict String OutVal)
 dicSetNewLocal name value stackdic =
     let
@@ -233,7 +220,6 @@ dicInit =
 
 type Context
     = Context
-        --{ constants : Dict String OutVal
         { constants : Stack.Stack (Dict.Dict String OutVal)
         , functions : Dict String (Context -> Input -> OutVal)
         , functop : Bool
@@ -248,10 +234,6 @@ type Context
 
 empty : Context
 empty =
-    --let
-    --  stack = Stack.initialise
-    --  stack_ = Stack.push Dict.empty stack
-    --in
     Context
         --{ constants = Dict.empty
         { constants = dicInit
@@ -406,11 +388,6 @@ argsToAvArgs userenv userfunc context exprs =
 
 
 
---evaluate : Expr -> OutVal
---evaluate :  Context -> Expr -> OutVal
---evaluate :  Context -> Expr -> ExprResult String OutVal (String, (Array.Array ArgValue))
---evaluate :  (UserEnv -> Context -> String -> (Array.Array ArgValue) -> OutVal) -> Context -> Expr -> ExprResult String OutVal (String, (Array.Array ArgValue))
-
 
 evaluate : userenv -> (userenv -> Context -> String -> Array.Array ArgValue -> OutVal) -> Context -> Expr -> ExprResult String OutVal ( String, Array.Array ArgValue )
 evaluate userenv userfunc context expr =
@@ -431,19 +408,6 @@ evaluate userenv userfunc context expr =
             in
             ExprOk result
 
-        {--
-    Function name args ->
-         let
-           func_ = getFunction name context
-         in
-           case func_ of
-                     Just f ->
-                            ExprOk (f context args)
-                     _ ->
-                            --ExprNotFoundFunc  ("**not_found function:" ++ name)
-                            --ExprNotFoundFunc  (name,args)
-                            ExprOk (userfunc  userenv context name args)
---}
         Function name args ->
             let
                 func_ =
@@ -612,17 +576,6 @@ evaluate userenv userfunc context expr =
             ExprOk (ODict dt2)
 
         Add a b ->
-            {--
-     let
-       a_ = case (evaluate a) of
-               OFloat n -> n
-               _ -> 0
-       b_ = case (evaluate b) of
-               OFloat n -> n
-               _ -> 0
-     in
-     OFloat ( a_ +  b_)
-    --}
             let
                 a_ =
                     evaluate userenv userfunc context a
@@ -636,6 +589,9 @@ evaluate userenv userfunc context expr =
 
                 ( ExprOk (OString aa), ExprOk (OString bb) ) ->
                     ExprOk (OString (aa ++ bb))
+
+                ( ExprOk (OArray aa), ExprOk (OArray bb) ) ->
+                    ExprOk (OArray (Array.append aa  bb))
 
                 _ ->
                     ExprOk (OFloat 0)
@@ -1030,36 +986,6 @@ default =
 
 
 
-{--
-array : Parser Expr
-array =
-  --succeed (String identity)
-  succeed (\identity -> String identity)
-    |. token "["
-    |= loop [] arrayHelp
-
-
-arrayHelp : List String -> Parser (Step (List String) String)
-arrayHelp revChunks =
-  oneOf
-    [ succeed (\chunk -> Loop (chunk :: revChunks))
-        |. token "\\"
-        |= oneOf
-            [ map (\_ -> "\n") (token "n")
-            , map (\_ -> "\t") (token "t")
-            , map (\_ -> "\r") (token "r")
-            , succeed String.fromChar
-                |. token "u{"
-                |= unicode
-                |. token "}"
-            ]
-    , token "]"
-        |> map (\_ -> Done (String.join "" (List.reverse revChunks)))
-    , chompWhile isUninteresting
-        |> getChompedString
-        |> map (\chunk -> Loop (chunk :: revChunks))
-    ]
---}
 ---------------------------------------------
 
 
@@ -1191,48 +1117,6 @@ dictValuesTail =
         ]
 
 
-
-{--
-dictValues :  Parser (List (ArgValue, ArgValue))
-dictValues  =
-  succeed (::)
-    |. spaces
-    |= stringValue
-    |. symbol ":"
-    |. spaces
-    |= oneOf
-        [ backtrackable  stringValue
-        , backtrackable  intValue
-        , backtrackable  floatValue
-        , varValue
-        ]
-    |. spaces
-    |= dictValuesTail 
-    |> andThen
-            (\( k, v ) ->
-                 succeed (k,v)
-            )
-
-dictValuesTail :  Parser (List (ArgValue, ArgValue))
-dictValuesTail  =
-  oneOf
-    [ succeed (::)
-        |. symbol ","
-        |. spaces
-        |= stringValue
-        |. symbol ":"
-        |. spaces
-        |= oneOf
-            [ backtrackable  stringValue
-            , backtrackable  intValue
-            , backtrackable  floatValue
-            , varValue
-            ]
-        |. spaces
-        |= lazy (\_ ->  dictValuesTail )
-    , succeed []
-    ]
---}
 ----------------------------------------------------------
 -- FUNC def  start
 ----------------------------------------------------------
@@ -1314,69 +1198,6 @@ varValueHelp =
 
 
 ---------------------------------------------
-{--
-varValue : Context -> Parser ArgValue
-varValue context =
-  succeed   Just
-    |. spaces
-    |= (var context)
-    |. spaces
-    |> andThen
-            (\( arg ) ->
-                 let
-                   r = case arg of
-                        Just (IntT n) ->
-                                 (AvInt   n)
-                        Just (FloatT n) ->
-                                 (AvFloat n)
-                        Just (StringT n)  ->
-                                 (AvString n)
-                        Just (BoolT n) ->
-                                 (AvBool  n)
-                        Nothing ->
-                                 (AvInt -1)
-                 in
-                 succeed (r)
-            )
---}
----------------------------------------------
-{--
-argValues :  Parser (List ArgValue)
-argValues  =
-  succeed (::)
-    |. spaces
-    |= oneOf
-        [ backtrackable  stringValue
-        , backtrackable  intValue
-        , backtrackable  floatValue
-        , varValue
-        ]
-    |. spaces
-    |= argValuesTail 
-    |> andThen
-            (\( arg ) ->
-                 succeed (arg)
-            )
-
-argValuesTail :  Parser (List ArgValue)
-argValuesTail  =
-  oneOf
-    [ succeed (::)
-        |. symbol ","
-        |. spaces
-        |= oneOf
-            [ backtrackable  stringValue
-            , backtrackable  intValue
-            , backtrackable  floatValue
-            , varValue
-            ]
-        |. spaces
-        |= lazy (\_ ->  argValuesTail )
-    , succeed []
-    ]
---}
---argValues :  Parser (List ArgValue)
-
 
 argValues : Parser (List Expr)
 argValues =
@@ -1390,9 +1211,6 @@ argValues =
                 succeed arg
             )
 
-
-
---argValuesTail :  Parser (List ArgValue)
 
 
 argValuesTail : Parser (List Expr)
@@ -1452,84 +1270,7 @@ formalArgValuesTail =
         , succeed []
         ]
 
-
-
---------------------------------------------- formalArg
-{--
-formalVarValue : Parser ArgValue
-formalVarValue =
-  succeed (\identity -> AvVar identity)
-    |= formalVarValueHelp
-
-formalVarValueHelp : Parser String
-formalVarValueHelp =
-  variable
-    { start = Char.isLower
-    , inner = \c -> Char.isAlphaNum c || c == '_'
-    , reserved = Set.fromList [ "if", "then", "else", "elsif", "while" , "do", "end", "for", "case", "let", "fn", "return","break","continue"]
-    }
-
-formalArgValues :  Parser (List ArgValue)
-formalArgValues  =
-  succeed (::)
-    |. spaces
-    |= formalVarValue
-    |. spaces
-    |= formalArgValuesTail 
-    |> andThen
-            (\( arg ) ->
-                 succeed (arg)
-            )
-
-formalArgValuesTail :  Parser (List ArgValue)
-formalArgValuesTail  =
-  oneOf
-    [ succeed (::)
-        |. symbol ","
-        |. spaces
-        |= formalVarValue
-        |. spaces
-        |= lazy (\_ ->  formalArgValuesTail )
-    , succeed []
-    ]
---}
 -------------------------------------------------------------
-{--
-func :  Parser Expr
-func  =
-    succeed Tuple.pair
-        |= backtrackable
-            (variable
-                { start = Char.isLower
-                , inner = Char.isAlphaNum
-                , reserved = Set.empty
-                }
-            )
-        |. backtrackable (symbol "(")
-        |= argValues 
-        |. symbol ")"
-        |> andThen
-            (\( name, arg ) ->
-                --let _ = Debug.log "func arg parse ..." 0 in
-                let
-                  --base = case arg of
-                  --         ListString arg_  ->
-                  --                let _ = Debug.log "ListString" 0 in
-                  --                ArrayString (Array.fromList arg_)
-                  --         ListInt arg_  ->
-                  --                let _ = Debug.log "ListInt" 0 in
-                  --                ArrayInt (Array.fromList arg_)
-                  --         ListFloat arg_  ->
-                  --                let _ = Debug.log "ListFloat" 0 in
-                  --                ArrayFloat (Array.fromList arg_)
-
-                  base = Array.fromList arg
-
-                in
-                succeed (Function name  base)
-            )
---}
-
 
 func : Parser Expr
 func =
@@ -1682,6 +1423,7 @@ like `0o17` and binary numbers like `0b01101100` are not allowed.
     run digits "6.022.31"  == Err ..
 
 -}
+
 digits : Parser Expr
 digits =
     number
@@ -1853,15 +1595,6 @@ operator =
         ]
 
 
-{-| We only have `+` and `*` in this parser. If we see a `MulOp` we can
-immediately group those two expressions. If we see an `AddOp` we wait to group
-until all the multiplies have been taken care of.
-
-This code is kind of tricky, but it is a baseline for what you would need if
-you wanted to add `/`, `-`, `==`, `&&`, etc. which bring in more complex
-associativity and precedence rules.
-
--}
 finalize : List ( Expr, Operator ) -> Expr -> Expr
 finalize revOps finalExpr =
     case revOps of
@@ -1914,7 +1647,7 @@ finalize revOps finalExpr =
 
 ---------------------------------------------------------------------
 
-
+{--
 test_strjoin : Context -> Input -> OutVal
 test_strjoin context ar =
     let
@@ -2104,7 +1837,10 @@ exprexec2 str =
     in
     result
 
+--}
+
 {--
+
 > import Expr exposing (..)
 > exprexec " 1 + 3 + (7 //2) "
 "OFloat 7" : String
