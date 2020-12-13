@@ -70,7 +70,6 @@ type Expr
     | EQ Expr Expr --[==] Bool
     | NE Expr Expr --[!=] Bool
     | Neg Expr     --[-]  Float
-    --| Neg Float     --[-]  Float
 
 
 type OutVal
@@ -729,6 +728,7 @@ evaluate userenv userfunc context expr =
                     ExprOk (OFloat (negate aa ))
                 _ ->
                     ExprOk (OFloat 0)
+
         Add a b ->
             let
                 a_ =
@@ -983,7 +983,7 @@ evaluate userenv userfunc context expr =
                             0
             in
             ExprOk (OBool (a_ >= b_))
-
+{--
         EQ a b ->
             let
                 a_ =
@@ -1003,7 +1003,21 @@ evaluate userenv userfunc context expr =
                             0
             in
             ExprOk (OBool (a_ == b_))
+--}
+        EQ a b ->
+            let
+                a_ =  evaluate userenv userfunc context a 
+                b_ =  evaluate userenv userfunc context b 
 
+            in
+            case (a_,b_) of
+               (ExprOk (OFloat a1) , ExprOk (OFloat b1)) ->
+                      ExprOk (OBool (a1 == b1))
+               (ExprOk (OString a1) , ExprOk (OString b1)) ->
+                      ExprOk (OBool (a1 == b1))
+               _ -> 
+                      ExprOk (OBool False)
+{--
         NE a b ->
             let
                 a_ =
@@ -1023,6 +1037,20 @@ evaluate userenv userfunc context expr =
                             0
             in
             ExprOk (OBool (a_ /= b_))
+--}
+        NE a b ->
+            let
+                a_ =  evaluate userenv userfunc context a 
+                b_ =  evaluate userenv userfunc context b 
+
+            in
+            case (a_,b_) of
+               (ExprOk (OFloat a1) , ExprOk (OFloat b1)) ->
+                      ExprOk (OBool (a1 /= b1))
+               (ExprOk (OString a1) , ExprOk (OString b1)) ->
+                      ExprOk (OBool (a1 /= b1))
+               _ -> 
+                      ExprOk (OBool False)
 
         Default a ->
             ExprOk (OBool True)
@@ -1936,33 +1964,6 @@ finalize revOps finalExpr =
 
 
 ---------------------------------------------------------------------
-{--
-type UOperator
-    = NegOp
-
-
-uoperator : Parser UOperator
-uoperator =
-    oneOf
-        [ map (\_ -> NegOp) (symbol "-")
-        ]
-
-
-ufinalize : List ( Expr, UOperator ) -> Expr -> Expr
-ufinalize revOps finalExpr =
-    case revOps of
-        [] ->
-            finalExpr
-
-        --( expr, NegOp ) :: otherRevOps ->
-        --    finalize otherRevOps (Nef expr finalExpr)
-
-        ( expr, NegOp ) :: otherRevOps ->
-            --Neg (finalize otherRevOps expr) finalExpr
-            Neg  finalExpr
-
---}
-
 
 ---------------------------------------------------------------------
 

@@ -167,6 +167,18 @@ exprexec2 str =
                                             ]
                                         )
                                     )
+                                |> addConstant "array_string_test"
+                                    (OArray
+                                        (Array.fromList
+                                            [ OString "a__"
+                                            , OString "b__"
+                                            , OString "c__"
+                                            , OString "d__"
+                                            , OString "e__"
+                                            , OString "f__"
+                                            ]
+                                        )
+                                    )
                                 |> addConstant "index" (OFloat 1)
                                 |> addConstant "dict_test"
                                     (ODict
@@ -269,6 +281,16 @@ test_list1 = Array.fromList [
    ,( " \"abc\" + strjoin( \"ABC\", \"XYZ\") " , OString "abcABCXYZ"  )
    ,( " \"abc\" + strjoin( \"ABC\", test1)   " , OString "abcABCOKOK" )
 
+   ,( " \"xyz\" == \"xyz\" "  ,  OBool True    )
+   ,( " \"xyz\" == \"xyZ\" "  ,  OBool False    )
+   ,( " \"xyz\" != \"xyz\" "  ,  OBool False    )
+   ,( " \"xyz\" != \"xyZ\" "  ,  OBool True    )
+
+   ,( " test1   == \"OKOK\" "  ,  OBool True    )
+   ,( " \"OKOK\" == test1   "  ,  OBool True    )
+   ,( " test1   != \"OKOK\" "  ,  OBool False    )
+   ,( " \"OKOK\" != test1   "  ,  OBool False    )
+
    ,( " 1.0 <= 100.1       "  ,  OBool True    )
    ,( " 1.0 <  100.1       "  ,  OBool True    )
    ,( " 1.0 >  100.1       "  ,  OBool False    )
@@ -280,7 +302,7 @@ test_list1 = Array.fromList [
    --,(  ,    )
    ]
 
-test_list2 = Array.fromList [  -- array
+test_list2 = Array.fromList [  -- array 
     ( " [ 1,2,3,4,5] " ,
         OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3,OFloat 4,OFloat 5])  )
 
@@ -293,11 +315,17 @@ test_list2 = Array.fromList [  -- array
    ,( " array_test[1]  ", 
         OFloat 2   )
 
+   ,( " array_string_test[3]  ", 
+        OString "d__"   )
+
    ,( " [ 1,2,3] + [4,5] " ,
         OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3,OFloat 4,OFloat 5])  )
 
    ,( " [ \"a\", \"b\"] + [\"c\", \"d\"] " ,
         OArray (Array.fromList [OString "a", OString "b", OString "c", OString "d"])  )
+
+   ,( " [ \"a\", \"b\"] + [\"c\", \"d\"] + array_string_test" ,
+        OArray (Array.fromList [OString "a", OString "b", OString "c", OString "d" ,OString "a__",OString "b__",OString "c__",OString "d__",OString "e__",OString "f__"])  )
    ]
 
 test_list3 = Array.fromList [  -- array slice
@@ -336,11 +364,18 @@ test_list3 = Array.fromList [  -- array slice
    ,( " array_test[-2:5]  ", 
         OArray (Array.fromList [OFloat 4,OFloat 5])   )
 
+   ,( " array_test[:2]  ", 
+        OArray (Array.fromList [OFloat 1,OFloat 2])   )
+
    ,( " array_test[2:]  ", 
         OArray (Array.fromList [OFloat 3,OFloat 4,OFloat 5])   )
 
-   ,( " array_test[:2]  ", 
-        OArray (Array.fromList [OFloat 1,OFloat 2])   )
+   ,( " array_string_test[:2]  ", 
+        OArray (Array.fromList [OString "a__",OString "b__"])   )
+
+   ,( " array_string_test[2:]  ", 
+        OArray (Array.fromList [OString "c__",OString "d__",OString "e__", OString "f__"])   )
+
 
    ]
 
