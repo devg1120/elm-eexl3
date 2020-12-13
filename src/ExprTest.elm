@@ -155,6 +155,7 @@ exprexec2 str =
                         context =
                             empty
                                 |> addConstant "test1" (OString "OKOK")
+                                |> addConstant "abc" (OString "_ABCD_")
                                 |> addConstant "test_float" (OFloat 10.1)
                                 |> addConstant "array_test"
                                     (OArray
@@ -390,11 +391,27 @@ test_list4 = Array.fromList [  -- dict
         OFloat 3   )
    ]
 
+test_list5 = Array.fromList [  -- variable method
+    ( "  abc.sub(1,2)  ", 
+        OString "AB"   )
+
+   ,( "  abc.len()  ", 
+        OFloat 6   )
+
+   ,( "  array_test.len()  ", 
+        OFloat 5   )
+
+   ,( "  abc.match(\"ABC\")  ", 
+        OBool True   )
+
+
+   ]
 
 r1 = Array.map testfunc test_list1
 r2 = Array.map testfunc test_list2
 r3 = Array.map testfunc test_list3
 r4 = Array.map testfunc test_list4
+r5 = Array.map testfunc test_list5
 
 
 -----------------------------------------------------

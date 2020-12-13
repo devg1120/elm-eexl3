@@ -55,6 +55,7 @@ type Expr
     | ArraySlice String (Expr, Expr)
     | DictLookUp String String
     | DictIndex String String
+    | VariableMethod String String (List Expr)
     | Add Expr Expr --[+]  String Float
     | Sub Expr Expr --[-]  Float
     | Mul Expr Expr --[*]  Float
@@ -348,6 +349,10 @@ getConstant name (Context { constants }) =
         Err a ->
             Just (OString a)
 
+getConstant2 : String -> Context -> Result String OutVal
+getConstant2 name (Context { constants }) =
+            dicGet name constants
+
 
 getFunction : String -> Context -> Maybe (Context -> Input -> OutVal)
 getFunction name (Context { functions }) =
@@ -429,7 +434,70 @@ evaluate userenv userfunc context expr =
                     --ExprNotFoundFunc  (name,args)
                     ExprOk (userfunc userenv context name args_)
 
-        --ArrayIndex name index ->
+
+--        VariableMethod variable_name func_name args ->
+--                   case func_name of
+--                        "len" ->
+--                             ExprOk (OFloat 99)
+--                        "sub" ->
+--                             ExprOk (OString "efg")
+--                        "match" ->
+--                             ExprOk (OBool True)
+--                        _ ->
+--                             ExprErr "vriable method name err"
+
+        VariableMethod variable_name func_name args ->
+              let
+
+                value =
+                    getConstant2 variable_name context
+                args_ =
+                    argsToAvArgs userenv userfunc context args
+
+               in
+                case value of
+                   Ok v ->
+                       case func_name of
+                               "len" ->
+                                    case v of
+                                        OString s ->
+                                            let
+                                              len = toFloat(String.length s)
+                                             in
+                                             ExprOk (OFloat len)
+                                        OArray a ->
+                                            let
+                                              len = toFloat(Array.length a)
+                                             in
+                                             ExprOk (OFloat len)
+                                        _ ->
+                                             ExprErr "len() err"
+
+                               "sub" ->
+                                    --ExprOk (OString "efg")
+                                    let
+                                       a_ = Array.get 0 args_
+                                       b_ = Array.get 1 args_
+                                    in
+                                    case (a_, b_, v) of
+                                        (Just (AvFloat a1), Just (AvFloat b2), OString s) ->
+                                            let
+                                              --str = String.slice 1 (1+2) s
+                                              str = String.slice (round a1) ((round a1)+(round b2)) s
+                                             in
+                                             ExprOk (OString str)
+                                        _ ->
+                                             ExprErr "sub() err"
+
+                               "match" ->
+                                    ExprOk (OBool True)
+                               _ ->
+                                    ExprErr ("vriable method err:" ++ func_name)
+
+                   Err e ->
+                            ExprErr ("not_found constant:" ++ variable_name)
+
+
         ArrayIndex name index_expr ->
             let
                 array_ =
@@ -1663,6 +1731,54 @@ dict_index =
 
 
 
+variable_method : Parser Expr
+variable_method =
+    succeed VariableMethod
+        |= variable
+            { start = Char.isLower
+
+            --, inner = Char.isAlphaNum
+            --, reserved = Set.empty
+            , inner = \c -> Char.isAlphaNum c || c == '_'
+            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "var", "def", "return", "break", "continue" ]
+            }
+        |. symbol "."
+        |= variable
+                { start = Char.isLower
+                , inner = Char.isAlphaNum
+                , reserved = Set.empty
+                }
+        |. symbol "("
+        |= oneOf
+            [ backtrackable argValues
+            , succeed []
+            ]
+        |. symbol ")"
+
+
+variable_method2 : Parser Expr
+variable_method2 =
+    succeed VariableMethod
+        |= variable
+            { start = Char.isLower
+
+            --, inner = Char.isAlphaNum
+            --, reserved = Set.empty
+            , inner = \c -> Char.isAlphaNum c || c == '_'
+            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "var", "def", "return", "break", "continue" ]
+            }
+        |. symbol "."
+        |= variable
+                { start = Char.isLower
+                , inner = Char.isAlphaNum
+                , reserved = Set.empty
+                }
+        |. symbol "("
+        |= argValues
+        |. symbol ")"
+
+
+
 -- PARSER
 
 
@@ -1729,6 +1845,7 @@ term =
             , backtrackable func
             , backtrackable array_slice
             , backtrackable array_index
+            , backtrackable variable_method
             , backtrackable dict_lookup
             , backtrackable dict_index
             , backtrackable default
