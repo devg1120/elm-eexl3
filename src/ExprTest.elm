@@ -241,33 +241,42 @@ rlt2 = Array.fromList []
 ----------------------------------------
 
 test_list1 = Array.fromList [ 
-    ( " 1 + 3 + (7 // 2) "  ,  OFloat 7          )
-   ,( " 1 + 3 + (7 /  2) "  ,  OFloat 7.5        )
-   ,( " 1 + 3 + (7 %  2) "  ,  OFloat 5          )
-   ,( " 1 + 3 + (6 /  2) "  ,  OFloat 7          )
-   ,( " 1 - 3 + (6 /  2) "  ,  OFloat 1          )
-   ,( " 1 - 5 + (6 /  2) "  ,  OFloat -1         )
-   ,( " -1 + 5           "  ,  OFloat -4         )
-   ,( " (-1) + 5           "  ,  OFloat -1       )
-   ,( " \"abc\" + \"ABC\" " ,  OString "abcABC"  )
-   ,( " False             " ,  OBool False       )
-   ,( " True              " ,  OBool True        )
-   ,( " True && True      " ,  OBool True        )
-   ,( " True && False     " ,  OBool False       )
-   ,( " True || True      " ,  OBool True        )
-   ,( " True || False     " ,  OBool True        )
-   ,( " \"abc\" + test1   " ,  OString "abcOKOK" )
-   ,( " 1.1 + test_float  " ,  OFloat 11.2       )
+    ( " 1 + 3 + (7 // 2)   "  ,  OFloat 7          )
+   ,( " 1 + 3 + (7 /  2)   "  ,  OFloat 7.5        )
+   ,( " 1 + 3 + (7 %  2)   "  ,  OFloat 5          )
+   ,( " 1 + 3 + (6 /  2)   "  ,  OFloat 7          )
+   ,( " 1 - 3 + (6 /  2)   "  ,  OFloat 1          )
+   ,( " 1 - 5 + (6 /  2)   "  ,  OFloat -1         )
+   ,( " 1 - 5 + (-6 / 2)   "  ,  OFloat -7         )
+   ,( " -1 + 5             "  ,  OFloat 4          )
+   ,( " (-1) + 5           "  ,  OFloat 4          )
+   ,( " -2 * 5             "  ,  OFloat -10        )
+   ,( " -2 * -5            "  ,  OFloat 10         )
+
+
+   ,( " False              "  ,  OBool False       )
+   ,( " True               "  ,  OBool True        )
+   ,( " True && True       "  ,  OBool True        )
+   ,( " True && False      "  ,  OBool False       )
+   ,( " True || True       "  ,  OBool True        )
+   ,( " True || False      "  ,  OBool True        )
+
+   ,( " \"abc\" + \"ABC\"  "  ,  OString "abcABC"  )
+   ,( " \"abc\" + test1    "  ,  OString "abcOKOK" )
+   ,( " 1.1 + test_float   "  ,  OFloat 11.2       )
+   ,( " -1.1 + test_float  "  ,  OFloat 9          )
+   ,( " -1 + test_float    "  ,  OFloat  9.1       )
    ,( " \"abc\" + strjoin( \"ABC\", \"XYZ\") " , OString "abcABCXYZ"  )
    ,( " \"abc\" + strjoin( \"ABC\", test1)   " , OString "abcABCOKOK" )
-   ,( " 1.0 <= 100.1                         " , OBool True    )
-   ,( " 1.0 <  100.1                         " , OBool True    )
-   ,( " 1.0 >  100.1                         " , OBool False    )
-   ,( " 1.0 >= 100.1                         " , OBool False    )
-   ,( " 1.0 == 100.1                         " , OBool False    )
-   ,( " 1.0 != 100.1                         " , OBool True     )
-   ,( " 1.1 == 1.1                           " , OBool True     )
-   ,( " e                                    " , OString "dicGetSerch...not found:e" )
+
+   ,( " 1.0 <= 100.1       "  ,  OBool True    )
+   ,( " 1.0 <  100.1       "  ,  OBool True    )
+   ,( " 1.0 >  100.1       "  ,  OBool False    )
+   ,( " 1.0 >= 100.1       "  ,  OBool False    )
+   ,( " 1.0 == 100.1       "  ,  OBool False    )
+   ,( " 1.0 != 100.1       "  ,  OBool True     )
+   ,( " 1.1 == 1.1         "  ,  OBool True     )
+   ,( " e                  "  ,  OString "dicGetSerch...not found:e" )
    --,(  ,    )
    ]
 
@@ -300,8 +309,14 @@ test_list3 = Array.fromList [  -- array slice
     ( " array_test  ", 
         OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3,OFloat 4,OFloat 5])   )
 
+   ,( " array_test[0]  ", 
+        OFloat 1   )
+
    ,( " array_test[1]  ", 
         OFloat 2   )
+
+   ,( " array_test[4]  ", 
+        OFloat 5   )
 
    ,( " array_test[index + 1]  ", 
         OFloat 3   )
@@ -317,15 +332,15 @@ test_list3 = Array.fromList [  -- array slice
 
    ,( " array_test[1:-1]  ", 
         OArray (Array.fromList [OFloat 2,OFloat 3,OFloat 4])   )
---
---   ,( " array_test[-2:5]  ", 
---        OArray (Array.fromList [OFloat 4,OFloat 5])   )
---
---   ,( " array_test[2:]  ", 
---        OArray (Array.fromList [OFloat 3,OFloat 4,OFloat 5])   )
---
---   ,( " array_test[:2]  ", 
---        OArray (Array.fromList [OFloat 1,OFloat 2])   )
+
+   ,( " array_test[-2:5]  ", 
+        OArray (Array.fromList [OFloat 4,OFloat 5])   )
+
+   ,( " array_test[2:]  ", 
+        OArray (Array.fromList [OFloat 3,OFloat 4,OFloat 5])   )
+
+   ,( " array_test[:2]  ", 
+        OArray (Array.fromList [OFloat 1,OFloat 2])   )
 
    ]
 

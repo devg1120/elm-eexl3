@@ -69,6 +69,8 @@ type Expr
     | GE Expr Expr --[>=] Bool
     | EQ Expr Expr --[==] Bool
     | NE Expr Expr --[!=] Bool
+    | Neg Expr     --[-]  Float
+    --| Neg Float     --[-]  Float
 
 
 type OutVal
@@ -464,8 +466,7 @@ evaluate userenv userfunc context expr =
                             OString " !!not_found ArrayIndex"
             in
             ExprOk ans
-
-        --ArraySlice name index1_expr index2_expr ->
+{--
         ArraySlice name pair_expr  ->
             let
                 index1_expr = Tuple.first pair_expr
@@ -502,6 +503,79 @@ evaluate userenv userfunc context expr =
                                         i2 = if index2 >= 0 then
                                                index2
                                               else
+                                               (Array.length a_) + index2 
+                                        a2 =
+                                            --Array.slice index1 index2 a_
+                                            Array.slice i1 i2 a_
+                                    in
+                                    OArray a2
+                                    --case a2 of
+                                    --    Just a2_ ->
+                                    --        OArray a2_
+
+                                    --    _ ->
+                                    --        OString " !!not_found arrayIndex"
+
+                                _ ->
+                                    OString " !!not_found arrayIndex"
+
+                        _ ->
+                            OString " !!not_found ArrayIndex"
+            in
+            ExprOk ans
+        --(OString " !!array_index")
+--}
+        ArraySlice name pair_expr  ->
+            let
+                index1_expr = Tuple.first pair_expr
+                index2_expr = Tuple.second pair_expr
+                array_ =
+                    getConstant name context
+
+                index1_ =
+                    case index1_expr of
+                       Default a ->
+                            ExprOk (OFloat -999)
+                       _ ->
+                            evaluate userenv userfunc context index1_expr
+
+                index1 = case index1_ of
+                      ExprOk (OFloat aa) ->
+                               floor aa
+                      _ ->
+                               -1
+                index2_ =
+                    case index2_expr of
+                       Default a ->
+                            ExprOk (OFloat -999)
+                       _ ->
+                            evaluate userenv userfunc context index2_expr
+
+                index2 = case index2_ of
+                      ExprOk (OFloat aa) ->
+                              floor aa
+                      _ ->
+                               -1
+
+                ans =
+                    case array_ of
+                        Just a ->
+                            case a of
+                                OArray a_ ->
+                                    let
+                                        i1 = if index1 == -999 then
+                                               0
+                                             else if index1 >= 0 then
+                                               index1 
+                                              else
+                                               (Array.length a_) + index1
+
+                                        i2 = if index2 == -999 then
+                                               Array.length a_  
+
+                                             else if index2 >= 0 then
+                                               index2
+                                             else
                                                (Array.length a_) + index2 
                                         a2 =
                                             --Array.slice index1 index2 a_
@@ -643,6 +717,18 @@ evaluate userenv userfunc context expr =
             in
             ExprOk (ODict dt2)
 
+        Neg a  ->
+            let
+                a_ =
+                    evaluate userenv userfunc context a
+
+            in
+            case ( a_ ) of
+                ( ExprOk (OFloat aa) ) ->
+                    --ExprOk (OFloat (aa ))
+                    ExprOk (OFloat (negate aa ))
+                _ ->
+                    ExprOk (OFloat 0)
         Add a b ->
             let
                 a_ =
@@ -1219,7 +1305,7 @@ stringValue =
             (\arg ->
                 succeed (AvString (arg |> Maybe.withDefault ""))
             )
-
+{--
 negateInt : Parser Int
 negateInt =
   oneOf
@@ -1228,14 +1314,15 @@ negateInt =
         |= int
     , int
     ]
+--}
 
 intValue : Parser ArgValue
 intValue =
     --succeed (::)
     succeed Just
         |. spaces
-        --|= int
-        |= negateInt
+        |= int
+        --|= negateInt
         |. spaces
         |> andThen
             (\arg ->
@@ -1409,20 +1496,66 @@ slice =
                 succeed  (Tuple.pair index1 index2)
             )
 
+{--
+sliceleft : Parser Expr --  $$:
+sliceleft =
+    succeed (\index -> index)
+        |= expression3
+        |. symbol ":"
+
+sliceright : Parser Expr --  :$$
+sliceright =
+    succeed (\index -> index)
+        |. symbol ":"
+        |= expression3
+--}
+
+sliceleft : Parser (Expr,Expr) --  $$:
+sliceleft =
+    succeed (\index -> (index,Default 0))
+        |= expression3
+        |. symbol ":"
+
+sliceright : Parser (Expr,Expr) --  :$$
+sliceright =
+    succeed (\index -> (Default 0, index))
+        |. symbol ":"
+        |= expression3
+{--
 array_slice : Parser Expr
 array_slice =
     succeed Tuple.pair
         |= variable
             { start = Char.isLower
-
-            --, inner = Char.isAlphaNum
-            --, reserved = Set.empty
             , inner = \c -> Char.isAlphaNum c || c == '_'
             , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
             }
         |. symbol "["
         --|= int
         |= slice
+        |> andThen
+            (\(name,index_pair)  ->
+                --succeed (ArrayIndex name index)
+                succeed (ArraySlice name index_pair)
+            )
+--}
+
+array_slice : Parser Expr
+array_slice =
+    succeed Tuple.pair
+        |= variable
+            { start = Char.isLower
+            , inner = \c -> Char.isAlphaNum c || c == '_'
+            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
+            }
+        |. symbol "["
+        --|= int
+        --|= slice
+        |= oneOf
+            [ backtrackable slice,
+              backtrackable sliceleft,
+              sliceright
+            ]
         |> andThen
             (\(name,index_pair)  ->
                 --succeed (ArrayIndex name index)
@@ -1534,6 +1667,11 @@ digits =
         , float = Just Floating
         }
 
+negdigits : Parser Expr
+negdigits =
+     succeed Neg
+        |. symbol "-"
+        |= digits
 
 bool : Parser Expr
 bool =
@@ -1567,6 +1705,7 @@ term =
             , backtrackable dict_index
             , backtrackable default
             , backtrackable typevar
+            , backtrackable negdigits
             , backtrackable digits
             , bool
             , succeed identity
@@ -1578,12 +1717,10 @@ term =
             ]
         |. spaces
 
-
 expression : Parser Expr
 expression =
     term
         |> andThen (expressionHelp [])
-
 
 expressionHelp : List ( Expr, Operator ) -> Expr -> Parser Expr
 expressionHelp revOps expr =
@@ -1668,6 +1805,7 @@ term3 =
             , backtrackable dict_index
             , backtrackable default
             , backtrackable typevar
+            , backtrackable negdigits
             , backtrackable digits
             , bool
             , succeed identity
@@ -1795,6 +1933,35 @@ finalize revOps finalExpr =
         ( expr, NEOp ) :: otherRevOps ->
             NE (finalize otherRevOps expr) finalExpr
 
+
+
+---------------------------------------------------------------------
+{--
+type UOperator
+    = NegOp
+
+
+uoperator : Parser UOperator
+uoperator =
+    oneOf
+        [ map (\_ -> NegOp) (symbol "-")
+        ]
+
+
+ufinalize : List ( Expr, UOperator ) -> Expr -> Expr
+ufinalize revOps finalExpr =
+    case revOps of
+        [] ->
+            finalExpr
+
+        --( expr, NegOp ) :: otherRevOps ->
+        --    finalize otherRevOps (Nef expr finalExpr)
+
+        ( expr, NegOp ) :: otherRevOps ->
+            --Neg (finalize otherRevOps expr) finalExpr
+            Neg  finalExpr
+
+--}
 
 
 ---------------------------------------------------------------------
