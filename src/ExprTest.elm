@@ -156,6 +156,9 @@ exprexec2 str =
                             empty
                                 |> addConstant "test1" (OString "OKOK")
                                 |> addConstant "abc" (OString "_ABCD_")
+                                |> addConstant "regex_test" (OString "123 ABC aas qdd A987 SDDFGG A666")
+                                |> addConstant "findstr1" (OString "A(BC)")
+                                |> addConstant "findstr2" (OString "A(\\d\\d\\d)")
                                 |> addConstant "test_float" (OFloat 10.1)
                                 |> addConstant "array_test"
                                     (OArray
@@ -391,6 +394,9 @@ test_list4 = Array.fromList [  -- dict
         OFloat 3   )
    ]
 
+findstr1 = "A(BC)"
+findstr2 = "A(\\d\\d\\d)"
+
 test_list5 = Array.fromList [  -- variable method
     ( "  abc.sub(1,2)  ", 
         OString "AB"   )
@@ -404,6 +410,21 @@ test_list5 = Array.fromList [  -- variable method
    ,( "  abc.match(\"ABC\")  ", 
         OBool True   )
 
+                                -- "regex_test" (OString "123 ABC aas qdd A987 SDDFGG A666")
+                                -- "findstr1"   (OString "A(BC)")
+                                -- "findstr2"   (OString "A(\\d\\d\\d)")
+
+   ,( "  regex_test.find(\"A(BC)\")  ", 
+        OArray (Array.fromList [OString "BC"])   )
+
+   ,( "  regex_test.find(\"A(XY)\")  ", 
+        OArray (Array.fromList [])   )
+
+   ,( "  regex_test.find(findstr1)  ", 
+        OArray (Array.fromList [OString "BC"])   )
+
+   ,( "  regex_test.find(findstr2)  ", 
+       OArray (Array.fromList [OString "987",OString "666"])   )
 
    ]
 

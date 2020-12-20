@@ -29,6 +29,7 @@ import Dict exposing (Dict)
 import Parser exposing (..)
 import Set exposing (Set)
 import Stack
+import Regex
 
 
 
@@ -474,7 +475,6 @@ evaluate userenv userfunc context expr =
                                              ExprErr "len() err"
 
                                "sub" ->
-                                    --ExprOk (OString "efg")
                                     let
                                        a_ = Array.get 0 args_
                                        b_ = Array.get 1 args_
@@ -482,12 +482,56 @@ evaluate userenv userfunc context expr =
                                     case (a_, b_, v) of
                                         (Just (AvFloat a1), Just (AvFloat b2), OString s) ->
                                             let
-                                              --str = String.slice 1 (1+2) s
                                               str = String.slice (round a1) ((round a1)+(round b2)) s
                                              in
                                              ExprOk (OString str)
                                         _ ->
                                              ExprErr "sub() err"
+                               "find" ->
+                                    let
+                                       a_ = Array.get 0 args_
+                                    in
+                                    case (a_,  v) of
+                                        (Just (AvString a1),  OString s) ->
+                                            let
+                                               regex = Maybe.withDefault Regex.never <| 
+                                                          Regex.fromString a1
+                                               result = Regex.find regex s
+                                               func_5 a =
+                                                   let
+                                                     s_ = a.submatches
+                                                   in
+                                                   s_
+
+
+                                               list_ = List.map func_5 result
+
+                                               func_2 a =
+                                                          List.head a
+
+                                               list_2 = List.map func_2 list_
+
+                                               arr_ = Array.fromList list_2
+
+                                               func_3 a =
+                                                   case a of
+                                                       Just a3 ->
+                                                           case a3 of
+                                                              Just a4 ->
+                                                                  OString a4
+                                                              _ ->
+                                                                  OString "find err1"
+                                                       _ ->
+                                                           OString "find err2"
+
+                                          
+                                               arr_2 = Array.map func_3 arr_
+                                             in
+                                             ExprOk (OArray arr_2)
+
+                                        _ ->
+                                             ExprErr "find() err"
+
 
                                "match" ->
                                     ExprOk (OBool True)
