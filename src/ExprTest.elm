@@ -157,8 +157,10 @@ exprexec2 str =
                                 |> addConstant "test1" (OString "OKOK")
                                 |> addConstant "abc" (OString "_ABCD_")
                                 |> addConstant "regex_test" (OString "123 ABC aas qdd A987 SDDFGG A666")
+                                |> addConstant "regex_test2" (OString " ABC aas qdd A SDDFGG A")
                                 |> addConstant "findstr1" (OString "A(BC)")
                                 |> addConstant "findstr2" (OString "A(\\d\\d\\d)")
+                                |> addConstant "findstr3" (OString "(\\d\\d\\d)")
                                 |> addConstant "test_float" (OFloat 10.1)
                                 |> addConstant "array_test"
                                     (OArray
@@ -413,6 +415,7 @@ test_list5 = Array.fromList [  -- variable method
                                 -- "regex_test" (OString "123 ABC aas qdd A987 SDDFGG A666")
                                 -- "findstr1"   (OString "A(BC)")
                                 -- "findstr2"   (OString "A(\\d\\d\\d)")
+                                -- "findstr3"   (OString "(\\d\\d\\d)")
 
    ,( "  regex_test.find(\"A(BC)\")  ", 
         OArray (Array.fromList [OString "BC"])   )
@@ -425,6 +428,18 @@ test_list5 = Array.fromList [  -- variable method
 
    ,( "  regex_test.find(findstr2)  ", 
        OArray (Array.fromList [OString "987",OString "666"])   )
+
+   ,( "  regex_test.find(findstr3)  ", 
+       OArray (Array.fromList [OString "123",OString "987",OString "666"])   )
+
+   ,( "  regex_test.isContain(\"[0-9]\")  ", 
+        OBool True   )
+
+   ,( "  regex_test2.isContain(\"[0-9]\")  ", 
+        OBool False   )
+
+   ,( "  regex_test.replace(\"[0-9]\",\"-\")  ", 
+        OString "--- ABC aas qdd A--- SDDFGG A---"   )
 
    ]
 

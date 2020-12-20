@@ -487,6 +487,7 @@ evaluate userenv userfunc context expr =
                                              ExprOk (OString str)
                                         _ ->
                                              ExprErr "sub() err"
+
                                "find" ->
                                     let
                                        a_ = Array.get 0 args_
@@ -531,6 +532,50 @@ evaluate userenv userfunc context expr =
 
                                         _ ->
                                              ExprErr "find() err"
+
+
+                               "isContain" ->
+                                    let
+                                       a_ = Array.get 0 args_
+                                    in
+                                    case (a_,  v) of
+                                        (Just (AvString a1),  OString s) ->
+                                            let
+                                               regex = Maybe.withDefault Regex.never <| 
+                                                          Regex.fromString a1
+                                               result = Regex.contains regex s
+
+                                             in
+                                             case result of
+                                                True ->
+                                                   ExprOk (OBool True)
+                                                False ->
+                                                   ExprOk (OBool False)
+
+                                        _ ->
+                                             ExprErr "isCotain() err"
+
+
+                               "replace" ->
+                                    let
+                                       a_ = Array.get 0 args_
+                                       b_ = Array.get 1 args_
+                                    in
+                                    case (a_, b_, v) of
+                                        (Just (AvString a1), Just (AvString b1),  OString s) ->
+                                            let
+                                               regex = Maybe.withDefault Regex.never <| 
+                                                          Regex.fromString a1
+                                               acf _ =
+                                                      b1
+
+                                               result = Regex.replace regex acf s
+
+                                            in
+                                            ExprOk (OString result)
+
+                                        _ ->
+                                             ExprErr "isCotain() err"
 
 
                                "match" ->
