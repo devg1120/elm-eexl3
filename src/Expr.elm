@@ -577,6 +577,36 @@ evaluate userenv userfunc context expr =
                                         _ ->
                                              ExprErr "isCotain() err"
 
+                               "split" ->
+                                    let
+                                       a_ = Array.get 0 args_
+                                    in
+                                    case (a_,  v) of
+                                        (Just (AvString a1),   OString s) ->
+                                            let
+                                               regex = Maybe.withDefault Regex.never <| 
+                                                          Regex.fromString a1
+
+                                               result = Regex.split regex  s
+
+                                               strip a =
+                                                       String.replace " " "" a
+
+                                               result2 = List.map strip result
+                                               arr_  = Array.fromList result2
+
+                                               func_3 a =
+                                                    OString a
+
+                                               arr_2 = Array.map func_3 arr_
+
+                                            in
+                                            ExprOk (OArray arr_2)
+
+                                        _ ->
+                                             ExprErr "isCotain() err"
+
+
 
                                "match" ->
                                     ExprOk (OBool True)

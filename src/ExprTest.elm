@@ -158,6 +158,7 @@ exprexec2 str =
                                 |> addConstant "abc" (OString "_ABCD_")
                                 |> addConstant "regex_test" (OString "123 ABC aas qdd A987 SDDFGG A666")
                                 |> addConstant "regex_test2" (OString " ABC aas qdd A SDDFGG A")
+                                |> addConstant "split_test" (OString "tom , 99, 90, 85 ")
                                 |> addConstant "findstr1" (OString "A(BC)")
                                 |> addConstant "findstr2" (OString "A(\\d\\d\\d)")
                                 |> addConstant "findstr3" (OString "(\\d\\d\\d)")
@@ -412,10 +413,10 @@ test_list5 = Array.fromList [  -- variable method
    ,( "  abc.match(\"ABC\")  ", 
         OBool True   )
 
-                                -- "regex_test" (OString "123 ABC aas qdd A987 SDDFGG A666")
-                                -- "findstr1"   (OString "A(BC)")
-                                -- "findstr2"   (OString "A(\\d\\d\\d)")
-                                -- "findstr3"   (OString "(\\d\\d\\d)")
+                -- "regex_test" (OString "123 ABC aas qdd A987 SDDFGG A666")
+                -- "findstr1"   (OString "A(BC)")
+                -- "findstr2"   (OString "A(\\d\\d\\d)")
+                -- "findstr3"   (OString "(\\d\\d\\d)")
 
    ,( "  regex_test.find(\"A(BC)\")  ", 
         OArray (Array.fromList [OString "BC"])   )
@@ -441,6 +442,8 @@ test_list5 = Array.fromList [  -- variable method
    ,( "  regex_test.replace(\"[0-9]\",\"-\")  ", 
         OString "--- ABC aas qdd A--- SDDFGG A---"   )
 
+   ,( "  split_test.split(\",\")  ", 
+        OArray (Array.fromList [OString "tom",OString "99",OString "90",OString "85"])   )
    ]
 
 r1 = Array.map testfunc test_list1
