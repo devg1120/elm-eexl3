@@ -16,7 +16,6 @@ module Expr exposing
     , expression
     , formalArgValues
     , getConstant
-    , getConstant2
     , newConstant
     , setConstant
     , typevar
@@ -405,30 +404,20 @@ evaluate : userenv -> (userenv -> Context -> String -> Array.Array ArgValue -> O
 evaluate userenv userfunc context expr =
     case expr of
         Variable name ->
-            --let
-            --    value =
-            --        getConstant name context
-
-            --    result =
-            --        case value of
-            --            Just v ->
-            --                v
-
-            --            _ ->
-            --                OString ("not_found constant:" ++ name)
-            --in
-            --ExprOk result
-
             let
+                --value = OString "testOK"
                 value =
-                    getConstant2 name context
-            in
-            case value of
-                        Ok v ->
-                            ExprOk v
+                    getConstant name context
 
-                        Err v ->
-                            ExprErr v
+                result =
+                    case value of
+                        Just v ->
+                            v
+
+                        _ ->
+                            OString ("not_found constant:" ++ name)
+            in
+            ExprOk result
 
         Function name args ->
             let
@@ -664,7 +653,65 @@ evaluate userenv userfunc context expr =
                             OString " !!not_found ArrayIndex"
             in
             ExprOk ans
+{--
+        ArraySlice name pair_expr  ->
+            let
+                index1_expr = Tuple.first pair_expr
+                index2_expr = Tuple.second pair_expr
+                array_ =
+                    getConstant name context
 
+                index1_ =
+                    evaluate userenv userfunc context index1_expr
+                index1 = case index1_ of
+                      ExprOk (OFloat aa) ->
+                               floor aa
+                      _ ->
+                               -1
+                index2_ =
+                    evaluate userenv userfunc context index2_expr
+                index2 = case index2_ of
+                      ExprOk (OFloat aa) ->
+                              floor aa
+                      _ ->
+                               -1
+
+                ans =
+                    case array_ of
+                        Just a ->
+                            case a of
+                                OArray a_ ->
+                                    let
+                                        i1 = if index1 >= 0 then
+                                               index1 
+                                              else
+                                               (Array.length a_) + index1
+
+                                        i2 = if index2 >= 0 then
+                                               index2
+                                              else
+                                               (Array.length a_) + index2 
+                                        a2 =
+                                            --Array.slice index1 index2 a_
+                                            Array.slice i1 i2 a_
+                                    in
+                                    OArray a2
+                                    --case a2 of
+                                    --    Just a2_ ->
+                                    --        OArray a2_
+
+                                    --    _ ->
+                                    --        OString " !!not_found arrayIndex"
+
+                                _ ->
+                                    OString " !!not_found arrayIndex"
+
+                        _ ->
+                            OString " !!not_found ArrayIndex"
+            in
+            ExprOk ans
+        --(OString " !!array_index")
+--}
         ArraySlice name pair_expr  ->
             let
                 index1_expr = Tuple.first pair_expr
@@ -888,92 +935,121 @@ evaluate userenv userfunc context expr =
                 ( ExprOk (OArray aa), ExprOk (OArray bb) ) ->
                     ExprOk (OArray (Array.append aa  bb))
 
-                (_ , _) ->
-                    ExprErr "+ value must Float/String/Array"
+                _ ->
+                    ExprOk (OFloat 0)
 
         Sub a b ->
             let
                 a_ =
-                    evaluate userenv userfunc context a 
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
 
                 b_ =
-                    evaluate userenv userfunc context b 
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
             in
-            case (a_, b_) of
-                   (ExprOk (OFloat a__), ExprOk (OFloat b__)) ->
-                          ExprOk (OFloat (a__ - b__))
-                   (_ , _) ->
-                          ExprErr "- value must Float"
+            ExprOk (OFloat (a_ - b_))
 
         Mul a b ->
             let
                 a_ =
-                    evaluate userenv userfunc context a 
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
 
                 b_ =
-                    evaluate userenv userfunc context b 
-            in
-            case (a_, b_) of
-                   (ExprOk (OFloat a__), ExprOk (OFloat b__)) ->
-                          ExprOk (OFloat (a__ * b__))
-                   (_ , _) ->
-                          ExprErr "* value must Float"
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
 
+                        _ ->
+                            0
+            in
+            ExprOk (OFloat (a_ * b_))
 
         Div a b ->
             let
                 a_ =
-                     evaluate userenv userfunc context a 
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+
                 b_ =
-                     evaluate userenv userfunc context b 
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
             in
-            case (a_, b_) of
-                   (ExprOk (OFloat a__), ExprOk (OFloat b__)) ->
-                          ExprOk (OFloat (a__ / b__))
-                   (_ , _) ->
-                          ExprErr "div value must Float"
+            ExprOk (OFloat (a_ / b_))
 
         Div2 a b ->
             let
                 a_ =
-                     evaluate userenv userfunc context a 
-                b_ =
-                     evaluate userenv userfunc context b 
-            in
-            case (a_, b_) of
-                   (ExprOk (OFloat a__), ExprOk (OFloat b__)) ->
-                          ExprOk (OFloat (toFloat (floor a__ // floor b__)))
-                   (_ , _) ->
-                          ExprErr "div2 value must Float"
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
 
+                        _ ->
+                            0
+
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+            in
+            ExprOk (OFloat (toFloat (floor a_ // floor b_)))
 
         Div3 a b ->
             let
                 a_ =
-                    evaluate userenv userfunc context a 
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
 
                 b_ =
-                    evaluate userenv userfunc context b 
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
             in
-            case (a_, b_) of
-                   (ExprOk (OFloat a__), ExprOk (OFloat b__)) ->
-                          let
-                              a2 =
-                                  floor a__
+            let
+                a2 =
+                    floor a_
 
-                              b2 =
-                                  floor b__
+                b2 =
+                    floor b_
 
-                              div_ =
-                                  a2 // b2
+                div_ =
+                    a2 // b2
 
-                              ans_ =
-                                  a2 - (div_ * b2)
-                          in
-                          ExprOk (OFloat (toFloat ans_))
-                   (_ , _) ->
-                          ExprErr "div3 value must Float"
-
+                ans_ =
+                    a2 - (div_ * b2)
+            in
+            ExprOk (OFloat (toFloat ans_))
 
         And a b ->
             let
@@ -1095,7 +1171,27 @@ evaluate userenv userfunc context expr =
                             0
             in
             ExprOk (OBool (a_ >= b_))
+{--
+        EQ a b ->
+            let
+                a_ =
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
 
+                        _ ->
+                            0
+
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+            in
+            ExprOk (OBool (a_ == b_))
+--}
         EQ a b ->
             let
                 a_ =  evaluate userenv userfunc context a 
@@ -1107,12 +1203,29 @@ evaluate userenv userfunc context expr =
                       ExprOk (OBool (a1 == b1))
                (ExprOk (OString a1) , ExprOk (OString b1)) ->
                       ExprOk (OBool (a1 == b1))
-               (ExprOk (OBool a1) , ExprOk (OBool b1)) ->
-                      ExprOk (OBool (a1 == b1))
                _ -> 
-                      ExprErr "== UnMatch Type Float/String/Bool"
+                      ExprOk (OBool False)
+{--
+        NE a b ->
+            let
+                a_ =
+                    case evaluate userenv userfunc context a of
+                        ExprOk (OFloat n) ->
+                            n
 
+                        _ ->
+                            0
 
+                b_ =
+                    case evaluate userenv userfunc context b of
+                        ExprOk (OFloat n) ->
+                            n
+
+                        _ ->
+                            0
+            in
+            ExprOk (OBool (a_ /= b_))
+--}
         NE a b ->
             let
                 a_ =  evaluate userenv userfunc context a 
@@ -1124,10 +1237,8 @@ evaluate userenv userfunc context expr =
                       ExprOk (OBool (a1 /= b1))
                (ExprOk (OString a1) , ExprOk (OString b1)) ->
                       ExprOk (OBool (a1 /= b1))
-               (ExprOk (OBool a1) , ExprOk (OBool b1)) ->
-                      ExprOk (OBool (a1 /= b1))
                _ -> 
-                      ExprErr "== UnMatch Type Float/String/Bool"
+                      ExprOk (OBool False)
 
         Default a ->
             ExprOk (OBool True)

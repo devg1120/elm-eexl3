@@ -4,6 +4,7 @@ import Expr exposing (..)
 import Array
 import Dict
 
+import Parser exposing (..)
 
 ---------------------------------------------------------------------
 
@@ -137,6 +138,88 @@ exprexec str =
     result
 
 
+getStringIndex : String -> Int -> Int -> Int -> Int -> String
+getStringIndex mstr r c r_ c_ =
+     if  r < 1 || c < 1 then
+         "N/A row & col not negative"
+     else if r < r_ then
+         "N/A over col"
+     else if r == r_ && c == c_ then
+         String.left 1 mstr
+     else
+        let
+          char = String.left 1 mstr
+          (r_2 , c_2 )= if char == "\n" then
+                           (r_ + 1,   1)
+                        else
+                           (r_ , c_ + 1)
+
+          --(r_2, c_2) =  case (String.uncons mstr) of
+          --         Just ('\n', tstr_)  ->
+          --                 (r_ + 1 , 1 )
+          --         _ ->
+          --                 (r_ , c_ + 1)
+
+          mstr2 = String.dropLeft 1 mstr 
+        in 
+        if mstr2 == "" then
+           "N/A over row"
+        else
+           getStringIndex mstr2 r c r_2 c_2
+
+stringIndex : String -> Int -> Int -> String
+stringIndex str_ r c =
+        getStringIndex str_ r c 1 1
+
+
+errAnalysis : String -> List DeadEnd -> String
+errAnalysis source err =
+            let
+               h = List.head err
+               --c = case  problem of
+               p = case  h of
+                     Just h_ ->
+                         let
+                            c = String.fromInt h_.col
+                            r = String.fromInt h_.row
+                            sc = stringIndex source h_.row h_.col 
+                         in
+                         case h_.problem of
+                              Expecting s ->
+                                "UnExpect " ++ r ++ ":" ++ c ++ " -> " ++ sc 
+                              ExpectingInt ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingHex ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingOctal ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingBinary ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingFloat ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingNumber ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingVariable ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingSymbol s ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingKeyword s ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingEnd ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              UnexpectedChar ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              Problem s ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              BadRepeat ->
+                                "unExpect:" ++ r ++ "-" ++ c
+
+                     Nothing ->
+                         --Problem "nothing"
+                         "nothing"
+            in
+            p
+
 exprexec2 : String -> ExprResult String OutVal (String, (Array.Array ArgValue))
 exprexec2 str =
     let
@@ -148,7 +231,8 @@ exprexec2 str =
                 Err err ->
                     --Debug.toString err
                     --ExprErr "AST Error" (OString "err")
-                    ExprErr "AST Error" 
+                    --ExprErr ("+AST Error-" ++ (Debug.toString err) )
+                    ExprErr (errAnalysis str err )
 
                 Ok expr ->
                     let
@@ -227,9 +311,13 @@ test_check expr result =
                      if result == value then
                         "OK"
                      else
-                        "ERR " ++ (Debug.toString value)
+                        "ExprOK ERR " ++ (Debug.toString value)
             ExprErr err ->
-                        "ExprErr"
+                     if result == (OString err) then
+                        "Er"
+                     else
+                        "ExprErr ERR " ++ (Debug.toString err)
+
             ExprNotFoundFunc notfound ->
                         "ExprNotFoundFunc"
                      
@@ -261,54 +349,173 @@ rlt2 = Array.fromList []
 
 test_list1 = Array.fromList [ 
     ( " 1 + 3 + (7 // 2)   "  ,  OFloat 7          )
+   ,( """ 1 + 3  
+             + (7 // 2)  """  ,  OFloat 7          )
    ,( " 1 + 3 + (7 /  2)   "  ,  OFloat 7.5        )
    ,( " 1 + 3 + (7 %  2)   "  ,  OFloat 5          )
    ,( " 1 + 3 + (6 /  2)   "  ,  OFloat 7          )
    ,( " 1 - 3 + (6 /  2)   "  ,  OFloat 1          )
    ,( " 1 - 5 + (6 /  2)   "  ,  OFloat -1         )
+   ,( " 1 - 5 + (6 // 2)   "  ,  OFloat -1         )
    ,( " 1 - 5 + (-6 / 2)   "  ,  OFloat -7         )
    ,( " -1 + 5             "  ,  OFloat 4          )
    ,( " (-1) + 5           "  ,  OFloat 4          )
-   ,( " -2 * 5             "  ,  OFloat -10        )
+   ,( " -2 *  5            "  ,  OFloat -10        )
+   ,( "  2 * -5            "  ,  OFloat -10        )
    ,( " -2 * -5            "  ,  OFloat 10         )
+   ,( "( -2 * -5 )         "  ,  OFloat 10         )
 
 
    ,( " False              "  ,  OBool False       )
    ,( " True               "  ,  OBool True        )
    ,( " True && True       "  ,  OBool True        )
    ,( " True && False      "  ,  OBool False       )
+   ,( " False && False     "  ,  OBool False       )
    ,( " True || True       "  ,  OBool True        )
    ,( " True || False      "  ,  OBool True        )
+   ,( " False || False     "  ,  OBool False       )
 
    ,( " \"abc\" + \"ABC\"  "  ,  OString "abcABC"  )
    ,( " \"abc\" + test1    "  ,  OString "abcOKOK" )
-   ,( " 1.1 + test_float   "  ,  OFloat 11.2       )
+
+   ,( " test_float         "  ,  OFloat 10.1       )
+   ,( " 1.1  + test_float  "  ,  OFloat 11.2       )
    ,( " -1.1 + test_float  "  ,  OFloat 9          )
-   ,( " -1 + test_float    "  ,  OFloat  9.1       )
+   ,( " -1   + test_float  "  ,  OFloat  9.1       )
+
+   ,( " test1                "  ,  OString "OKOK"    )
+   ,( " strjoin(\"ABC\", \"XYZ\") "            , OString "ABCXYZ"     )
    ,( " \"abc\" + strjoin( \"ABC\", \"XYZ\") " , OString "abcABCXYZ"  )
    ,( " \"abc\" + strjoin( \"ABC\", test1)   " , OString "abcABCOKOK" )
 
-   ,( " \"xyz\" == \"xyz\" "  ,  OBool True    )
-   ,( " \"xyz\" == \"xyZ\" "  ,  OBool False    )
-   ,( " \"xyz\" != \"xyz\" "  ,  OBool False    )
-   ,( " \"xyz\" != \"xyZ\" "  ,  OBool True    )
+   ,( " \"xyz\" == \"xyz\"   "  ,  OBool True        )
+   ,( " \"123\" == \"123\"   "  ,  OBool True        )
+   ,( " \"xyz\" == \"xyZ\"   "  ,  OBool False       )
+   ,( " \"xyz\" != \"xyz\"   "  ,  OBool False       )
+   ,( " \"xyz\" != \"xyZ\"   "  ,  OBool True        )
 
-   ,( " test1   == \"OKOK\" "  ,  OBool True    )
-   ,( " \"OKOK\" == test1   "  ,  OBool True    )
-   ,( " test1   != \"OKOK\" "  ,  OBool False    )
-   ,( " \"OKOK\" != test1   "  ,  OBool False    )
+   ,( " test1                "  ,  OString "OKOK"    )
+   ,( " test1    == \"OKOK\" "  ,  OBool True        )
+   ,( " \"OKOK\" == test1    "  ,  OBool True        )
+   ,( " test1    != \"OKOK\" "  ,  OBool False       )
+   ,( " \"OKOK\" != test1    "  ,  OBool False       )
 
-   ,( " 1.0 <= 100.1       "  ,  OBool True    )
-   ,( " 1.0 <  100.1       "  ,  OBool True    )
-   ,( " 1.0 >  100.1       "  ,  OBool False    )
-   ,( " 1.0 >= 100.1       "  ,  OBool False    )
-   ,( " 1.0 == 100.1       "  ,  OBool False    )
-   ,( " 1.0 != 100.1       "  ,  OBool True     )
-   ,( " 1.1 == 1.1         "  ,  OBool True     )
-   ,( " e                  "  ,  OString "dicGetSerch...not found:e" )
+   ,( " 1.0 <= 100.1         "  ,  OBool True    )
+   ,( " 1.0 <  100.1         "  ,  OBool True    )
+   ,( " 1.0 >  100.1         "  ,  OBool False    )
+   ,( " 1.0 >= 100.1         "  ,  OBool False    )
+   ,( " 1.0 == 100.1         "  ,  OBool False    )
+   ,( " 1.0 != 100.1         "  ,  OBool True     )
+   ,( " 1.1 == 1.1           "  ,  OBool True     )
+
+   ,( " True == True         "  ,  OBool True    )
+   ,( " True != True         "  ,  OBool False     )
+   ,( " True == False         "  ,  OBool False    )
+   ,( " True != False         "  ,  OBool True     )
+
+   ,( " 1   <= 100.1         "  ,  OBool True    )
+   ,( " 1   <  100.1         "  ,  OBool True    )
+   ,( " 1   >  100.1         "  ,  OBool False    )
+   ,( " 1   >= 100.1         "  ,  OBool False    )
+   ,( " 1   == 100.1         "  ,  OBool False    )
+   ,( " 1   != 100.1         "  ,  OBool True     )
+   ,( " 1   == 1.1           "  ,  OBool False     )
+
+   ,( " 1.0 <= 100           "  ,  OBool True     )
+   ,( " 1.0 <  100           "  ,  OBool True     )
+   ,( " 1.0 >  100           "  ,  OBool False    )
+   ,( " 1.0 >= 100           "  ,  OBool False    )
+   ,( " 1.0 == 100           "  ,  OBool False    )
+   ,( " 1.0 != 100           "  ,  OBool True     )
+   ,( " 1.1 == 1             "  ,  OBool False    )
+
+   ,( " 1   <= 100           "  ,  OBool True     )
+   ,( " 1   <  100           "  ,  OBool True     )
+   ,( " 1   >  100           "  ,  OBool False    )
+   ,( " 1   >= 100           "  ,  OBool False    )
+   ,( " 1   == 100           "  ,  OBool False    )
+   ,( " 1   != 100           "  ,  OBool True     )
+   ,( " 1   == 1             "  ,  OBool True     )
+
+   ,( " e                    "  ,  OString "NotFound:e" )
    --,(  ,    )
    ]
 
+test_list1err = Array.fromList [ 
+    ( " 1 +- 3 + (7 // 2)   "  ,  OString "UnExpect 1:5 -> -"         )
+   ,( """ 1 + 3  
+            ++ (7 // 2)  """   ,  OString "UnExpect 2:14 -> +"        )
+   ,( " --1 + 5             "  ,  OString "UnExpect 1:2 -> -"         )
+   ,( " -2 ** 5             "  ,  OString "UnExpect 1:6 -> *"         )
+   ,( " false               "  ,  OString "NotFound:false"            )
+   ,( " True /  True        "  ,  OString "div value must Float"      )
+   ,( " True //  True       "  ,  OString "div2 value must Float"     )
+   ,( " True %  True        "  ,  OString "div3 value must Float"     )
+   ,( " True *  True        "  ,  OString "* value must Float"        )
+   ,( " True -  True        "  ,  OString "- value must Float"        )
+   ,( " True +  True        "  ,  OString "+ value must Float/String/Array"        )
+   ,( " \"abc\" - \"ABC\"   "  ,  OString "- value must Float"  )
+   ,( " \"abc\" - test1     "  ,  OString "- value must Float"  )
+
+   ,( " \"xyz\"  + test_float  "  ,  OString "+ value must Float/String/Array"       )
+--   ,( " -1.1 + test_float  "  ,  OFloat 9          )
+--   ,( " -1   + test_float  "  ,  OFloat  9.1       )
+--
+--   ,( " test1                "  ,  OString "OKOK"    )
+--   ,( " strjoin(\"ABC\", \"XYZ\") "            , OString "ABCXYZ"     )
+--   ,( " \"abc\" + strjoin( \"ABC\", \"XYZ\") " , OString "abcABCXYZ"  )
+--   ,( " \"abc\" + strjoin( \"ABC\", test1)   " , OString "abcABCOKOK" )
+--
+   ,( " \"xyz\" == 1   "  ,  OString "== UnMatch Type Float/String/Bool"        )
+--   ,( " \"123\" == \"123\"   "  ,  OBool True        )
+--   ,( " \"xyz\" == \"xyZ\"   "  ,  OBool False       )
+--   ,( " \"xyz\" != \"xyz\"   "  ,  OBool False       )
+--   ,( " \"xyz\" != \"xyZ\"   "  ,  OBool True        )
+--
+--   ,( " test1                "  ,  OString "OKOK"    )
+--   ,( " test1    == \"OKOK\" "  ,  OBool True        )
+--   ,( " \"OKOK\" == test1    "  ,  OBool True        )
+--   ,( " test1    != \"OKOK\" "  ,  OBool False       )
+--   ,( " \"OKOK\" != test1    "  ,  OBool False       )
+--
+--   ,( " 1.0 <= 100.1         "  ,  OBool True    )
+--   ,( " 1.0 <  100.1         "  ,  OBool True    )
+--   ,( " 1.0 >  100.1         "  ,  OBool False    )
+--   ,( " 1.0 >= 100.1         "  ,  OBool False    )
+--   ,( " 1.0 == 100.1         "  ,  OBool False    )
+--   ,( " 1.0 != 100.1         "  ,  OBool True     )
+--   ,( " 1.1 == 1.1           "  ,  OBool True     )
+--
+--   ,( " 1   <= 100.1         "  ,  OBool True    )
+--   ,( " 1   <  100.1         "  ,  OBool True    )
+--   ,( " 1   >  100.1         "  ,  OBool False    )
+--   ,( " 1   >= 100.1         "  ,  OBool False    )
+--   ,( " 1   == 100.1         "  ,  OBool False    )
+--   ,( " 1   != 100.1         "  ,  OBool True     )
+--   ,( " 1   == 1.1           "  ,  OBool False     )
+--
+--   ,( " 1.0 <= 100           "  ,  OBool True     )
+--   ,( " 1.0 <  100           "  ,  OBool True     )
+--   ,( " 1.0 >  100           "  ,  OBool False    )
+--   ,( " 1.0 >= 100           "  ,  OBool False    )
+--   ,( " 1.0 == 100           "  ,  OBool False    )
+--   ,( " 1.0 != 100           "  ,  OBool True     )
+--   ,( " 1.1 == 1             "  ,  OBool False    )
+--
+--   ,( " 1   <= 100           "  ,  OBool True     )
+--   ,( " 1   <  100           "  ,  OBool True     )
+--   ,( " 1   >  100           "  ,  OBool False    )
+--   ,( " 1   >= 100           "  ,  OBool False    )
+--   ,( " 1   == 100           "  ,  OBool False    )
+--   ,( " 1   != 100           "  ,  OBool True     )
+--   ,( " 1   == 1             "  ,  OBool True     )
+--
+--   ,( " e                    "  ,  OString "dicGetSerch...not found:e" )
+   --,(  ,    )
+   ]
+
+
+---------------------------------------------------------------------
 test_list2 = Array.fromList [  -- array 
     ( " [ 1,2,3,4,5] " ,
         OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3,OFloat 4,OFloat 5])  )
@@ -446,90 +653,11 @@ test_list5 = Array.fromList [  -- variable method
         OArray (Array.fromList [OString "tom",OString "99",OString "90",OString "85"])   )
    ]
 
+-----------------------------------------------------
 r1 = Array.map testfunc test_list1
 r2 = Array.map testfunc test_list2
 r3 = Array.map testfunc test_list3
 r4 = Array.map testfunc test_list4
 r5 = Array.map testfunc test_list5
 
-
------------------------------------------------------
-{--
-> import Expr exposing (..)
-> exprexec " 1 + 3 + (7 //2) "
-"OFloat 7" : String
-> exprexec " 1 + 3 + (7 /2) "
-"OFloat 7.5" : String
-> exprexec " 1 + 3 + (7 %2) "
-"OFloat 5" : String
-> exprexec " \"abc\" + \"ABC\" "
-"OString \"abcABC\"" : String
-> exprexec " False "
-"OBool False" : String
-> exprexec " True "
-"OBool True" : String
-> exprexec " True && True"
-"OBool True" : String
-> exprexec " True && False"
-"OBool False" : String
-> exprexec " True || True"
-"OBool True" : String
-> exprexec " True || False"
-"OBool True" : String
-> exprexec " \"abc\" + test1 "
-"OString \"abcOKOK\"" : String
-
-> exprexec " 1.1  + test_float "
-"OFloat 11.2" : String
-> exprexec " \"abc\" + strjoin( \"ABC\", \"XYZ\") "
-"OString \"abcABCXYZ\"" : Strin
-> exprexec " \"abc\" + strjoin( \"ABC\", test1) "
-"OString \"abcABCOKOK\"" : String
-
-> exprexec "1.0 <= 100.1"
-"OBool True" : String
-> exprexec "1.0 < 100.1"
-"OBool True" : String
-> exprexec "1.0 > 100.1"
-"OBool False" : String
-> exprexec "1.0 >= 100.1"
-"OBool False" : String
-> exprexec "1.0 <= 100.1"
-"OBool True" : String
-> exprexec "1.0 == 100.1"
-"OBool False" : String
-> exprexec "1.0 != 100.1"
-"OBool True" : String
-> exprexec "1.1 == 1.1"
-"OBool True" : String
-
-> exprexec "e"
-"OString \"not_found\"" : String
-
-                                --array
-> exprexec " [ 1,2,3,4,5] "
-"OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3])" : String
-
-> exprexec " [ \"1\",\"2\",\"3\",\"4\",\"5\"] "
-
-                                --dict
-> exprexec "{\"ab\" : 1, \"xy\" : 2}"
-"ODict (Dict.fromList [(\"ab\",OFloat 1),(\"xy\",OFloat 2)])" : String
-
-
-> exprexec " array_test " 
-"OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3,OFloat 4,OFloat 5])"
-    : String
-> exprexec " dict_test " 
-"ODict (Dict.fromList [(\"a\",OFloat 1),(\"b\",OFloat 2),(\"c\",OFloat 3),(\"d\",OFloat 4),(\"e\",OFloat 5)])"
-
-> exprexec "array_test[0]"
-"OFloat 1" : String
-
-> exprexec "dict_test.c"
-"OFloat 3" : String
-
-> exprexec "dict_test{\"c\"}"
-"OFloat 3" : String
-
---}
+e1 = Array.map testfunc test_list1err
