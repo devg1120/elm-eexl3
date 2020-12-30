@@ -42,18 +42,12 @@ type Expr
     | Floating Float
     | String String
     | Default Int
-      --| Array (Array.Array OutVal)
     | Array (Array.Array ArgValue)
     | Dict (Dict String ArgValue)
-      --| Dict (Dict ArgValue ArgValue)
     | Bool Bool
-      --| Variable OutVal
     | Variable String
-      --| Function String (Array.Array ArgValue)
     | Function String (List Expr)
-    --| ArrayIndex String Int
     | ArrayIndex String Expr
-    --| ArraySlice String Expr Expr
     | ArraySlice String (Expr, Expr)
     | DictLookUp String String
     | DictIndex String String
@@ -86,7 +80,6 @@ type OutVal
 
 
 --------------------------------------------------------- stack
-
 
 dicGetSerch : List (Dict.Dict String OutVal) -> String -> Result String OutVal
 dicGetSerch list name =
@@ -225,7 +218,6 @@ dicInit =
 
 --------------------------------------------------------- context
 
-
 type Context
     = Context
         { constants : Stack.Stack (Dict.Dict String OutVal)
@@ -340,7 +332,6 @@ addFunction name f (Context context) =
 
 getConstant : String -> Context -> Maybe OutVal
 getConstant name (Context { constants }) =
-    --Dict.get name constants
     let
         r =
             dicGet name constants
@@ -364,7 +355,6 @@ getFunction name (Context { functions }) =
 
 
 --------------------------------------------------------- evalate
-
 
 type ExprResult error value notfound
     = ExprOk value
@@ -405,20 +395,6 @@ evaluate : userenv -> (userenv -> Context -> String -> Array.Array ArgValue -> O
 evaluate userenv userfunc context expr =
     case expr of
         Variable name ->
-            --let
-            --    value =
-            --        getConstant name context
-
-            --    result =
-            --        case value of
-            --            Just v ->
-            --                v
-
-            --            _ ->
-            --                OString ("not_found constant:" ++ name)
-            --in
-            --ExprOk result
-
             let
                 value =
                     getConstant2 name context
@@ -447,17 +423,6 @@ evaluate userenv userfunc context expr =
                     --ExprNotFoundFunc  (name,args)
                     ExprOk (userfunc userenv context name args_)
 
-
---        VariableMethod variable_name func_name args ->
---                   case func_name of
---                        "len" ->
---                             ExprOk (OFloat 99)
---                        "sub" ->
---                             ExprOk (OString "efg")
---                        "match" ->
---                             ExprOk (OBool True)
---                        _ ->
---                             ExprErr "vriable method name err"
 
         VariableMethod variable_name func_name args ->
               let
@@ -736,7 +701,7 @@ evaluate userenv userfunc context expr =
                             OString " !!not_found ArrayIndex"
             in
             ExprOk ans
-        --(OString " !!array_index")
+
         DictLookUp name key ->
             let
                 dict_ =
@@ -766,7 +731,7 @@ evaluate userenv userfunc context expr =
             in
             ExprOk ans
 
-        --(OString " !!array_index")
+
         DictIndex name key ->
             let
                 dict_ =
@@ -796,7 +761,7 @@ evaluate userenv userfunc context expr =
             in
             ExprOk ans
 
-        --(OString " !!array_index")
+
         String s ->
             ExprOk (OString s)
 
@@ -1018,83 +983,51 @@ evaluate userenv userfunc context expr =
         -----------------------
         LT a b ->
             let
-                a_ =
-                    case evaluate userenv userfunc context a of
-                        ExprOk (OFloat n) ->
-                            n
+                a_ =  evaluate userenv userfunc context a 
+                b_ =  evaluate userenv userfunc context b 
 
-                        _ ->
-                            0
-
-                b_ =
-                    case evaluate userenv userfunc context b of
-                        ExprOk (OFloat n) ->
-                            n
-
-                        _ ->
-                            0
             in
-            ExprOk (OBool (a_ < b_))
+            case (a_,b_) of
+               (ExprOk (OFloat a1) , ExprOk (OFloat b1)) ->
+                      ExprOk (OBool (a1 < b1))
+               _ -> 
+                      ExprErr "<  UnMatch Type Float"
 
         GT a b ->
             let
-                a_ =
-                    case evaluate userenv userfunc context a of
-                        ExprOk (OFloat n) ->
-                            n
+                a_ =  evaluate userenv userfunc context a 
+                b_ =  evaluate userenv userfunc context b 
 
-                        _ ->
-                            0
-
-                b_ =
-                    case evaluate userenv userfunc context b of
-                        ExprOk (OFloat n) ->
-                            n
-
-                        _ ->
-                            0
             in
-            ExprOk (OBool (a_ > b_))
+            case (a_,b_) of
+               (ExprOk (OFloat a1) , ExprOk (OFloat b1)) ->
+                      ExprOk (OBool (a1 > b1))
+               _ -> 
+                      ExprErr ">  UnMatch Type Float"
 
         LE a b ->
             let
-                a_ =
-                    case evaluate userenv userfunc context a of
-                        ExprOk (OFloat n) ->
-                            n
+                a_ =  evaluate userenv userfunc context a 
+                b_ =  evaluate userenv userfunc context b 
 
-                        _ ->
-                            0
-
-                b_ =
-                    case evaluate userenv userfunc context b of
-                        ExprOk (OFloat n) ->
-                            n
-
-                        _ ->
-                            0
             in
-            ExprOk (OBool (a_ <= b_))
+            case (a_,b_) of
+               (ExprOk (OFloat a1) , ExprOk (OFloat b1)) ->
+                      ExprOk (OBool (a1 <= b1))
+               _ -> 
+                      ExprErr "<= UnMatch Type Float"
 
         GE a b ->
             let
-                a_ =
-                    case evaluate userenv userfunc context a of
-                        ExprOk (OFloat n) ->
-                            n
+                a_ =  evaluate userenv userfunc context a 
+                b_ =  evaluate userenv userfunc context b 
 
-                        _ ->
-                            0
-
-                b_ =
-                    case evaluate userenv userfunc context b of
-                        ExprOk (OFloat n) ->
-                            n
-
-                        _ ->
-                            0
             in
-            ExprOk (OBool (a_ >= b_))
+            case (a_,b_) of
+               (ExprOk (OFloat a1) , ExprOk (OFloat b1)) ->
+                      ExprOk (OBool (a1 >= b1))
+               _ -> 
+                      ExprErr ">= UnMatch Type Float"
 
         EQ a b ->
             let
@@ -1127,7 +1060,7 @@ evaluate userenv userfunc context expr =
                (ExprOk (OBool a1) , ExprOk (OBool b1)) ->
                       ExprOk (OBool (a1 /= b1))
                _ -> 
-                      ExprErr "== UnMatch Type Float/String/Bool"
+                      ExprErr "!= UnMatch Type Float/String/Bool"
 
         Default a ->
             ExprOk (OBool True)
@@ -2285,83 +2218,3 @@ exprexec2 str =
 
 --}
 
-{--
-
-> import Expr exposing (..)
-> exprexec " 1 + 3 + (7 //2) "
-"OFloat 7" : String
-> exprexec " 1 + 3 + (7 /2) "
-"OFloat 7.5" : String
-> exprexec " 1 + 3 + (7 %2) "
-"OFloat 5" : String
-> exprexec " \"abc\" + \"ABC\" "
-"OString \"abcABC\"" : String
-> exprexec " False "
-"OBool False" : String
-> exprexec " True "
-"OBool True" : String
-> exprexec " True && True"
-"OBool True" : String
-> exprexec " True && False"
-"OBool False" : String
-> exprexec " True || True"
-"OBool True" : String
-> exprexec " True || False"
-"OBool True" : String
-> exprexec " \"abc\" + test1 "
-"OString \"abcOKOK\"" : String
-
-> exprexec " 1.1  + test_flort "
-"OFloat 11.2" : String
-> exprexec " \"abc\" + strjoin( \"ABC\", \"XYZ\") "
-"OString \"abcABCXYZ\"" : Strin
-> exprexec " \"abc\" + strjoin( \"ABC\", test1) "
-"OString \"abcABCOKOK\"" : String
-
-> exprexec "1.0 <= 100.1"
-"OBool True" : String
-> exprexec "1.0 < 100.1"
-"OBool True" : String
-> exprexec "1.0 > 100.1"
-"OBool False" : String
-> exprexec "1.0 >= 100.1"
-"OBool False" : String
-> exprexec "1.0 <= 100.1"
-"OBool True" : String
-> exprexec "1.0 == 100.1"
-"OBool False" : String
-> exprexec "1.0 != 100.1"
-"OBool True" : String
-> exprexec "1.1 == 1.1"
-"OBool True" : String
-
-> exprexec "e"
-"OString \"not_found\"" : String
-
-                                --array
-> exprexec " [ 1,2,3,4,5] "
-"OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3])" : String
-
-> exprexec " [ \"1\",\"2\",\"3\",\"4\",\"5\"] "
-
-                                --dict
-> exprexec "{\"ab\" : 1, \"xy\" : 2}"
-"ODict (Dict.fromList [(\"ab\",OFloat 1),(\"xy\",OFloat 2)])" : String
-
-
-> exprexec " array_test " 
-"OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3,OFloat 4,OFloat 5])"
-    : String
-> exprexec " dict_test " 
-"ODict (Dict.fromList [(\"a\",OFloat 1),(\"b\",OFloat 2),(\"c\",OFloat 3),(\"d\",OFloat 4),(\"e\",OFloat 5)])"
-
-> exprexec "array_test[0]"
-"OFloat 1" : String
-
-> exprexec "dict_test.c"
-"OFloat 3" : String
-
-> exprexec "dict_test{\"c\"}"
-"OFloat 3" : String
-
---}
