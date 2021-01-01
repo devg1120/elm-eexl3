@@ -119,6 +119,28 @@ exprexec str =
                                             ]
                                         )
                                     )
+                                |> addConstant "dict_test2"
+                                    (ODict
+                                        (Dict.fromList
+                                            [ ( "ab", OArray
+                                                       (Array.fromList
+                                                                 [ OFloat 1
+                                                                 , OFloat 2
+                                                                 , OFloat 3
+                                                                 ]
+                                                        )
+                                              )
+                                            , ( "xy", OArray
+                                                       (Array.fromList
+                                                                 [ OFloat 4
+                                                                 , OFloat 5
+                                                                 , OFloat 6
+                                                                 ]
+                                                        )
+                                              )
+                                            ]
+                                        )
+                                    )
                                 |> addFunction "strjoin" test_strjoin
 
                         userenv =
@@ -254,6 +276,15 @@ exprexec2 str =
                                             ]
                                         )
                                     )
+                                |> addConstant "array_test2d"
+                                    (OArray
+                                        (Array.fromList
+                                            [ OArray (Array.fromList [OFloat 1,OFloat 2])
+                                            , OArray (Array.fromList [OFloat 3,OFloat 4])
+                                            , OArray (Array.fromList [OFloat 5,OFloat 6])
+                                            ]
+                                        )
+                                    )
                                 |> addConstant "array_string_test"
                                     (OArray
                                         (Array.fromList
@@ -266,7 +297,27 @@ exprexec2 str =
                                             ]
                                         )
                                     )
+                                |> addConstant "array_dict_test"
+                                    (OArray
+                                        (Array.fromList
+                                            [ODict  (Dict.fromList
+                                                        [ ("a", OFloat 1)
+                                                        , ("b", OFloat 2)
+                                                        , ("c", OFloat 3)
+                                                        ]
+                                                    )
+                                            ,ODict  (Dict.fromList
+                                                        [ ("a", OFloat 4)
+                                                        , ("b", OFloat 5)
+                                                        , ("c", OFloat 6)
+                                                        ]
+                                                    )
+                                            ]
+                                        )
+                                    )
                                 |> addConstant "index" (OFloat 1)
+                                |> addConstant "dict_index" (OString "c")
+                                |> addConstant "dict_index2" (OString "xy")
                                 |> addConstant "dict_test"
                                     (ODict
                                         (Dict.fromList
@@ -275,6 +326,28 @@ exprexec2 str =
                                             , ( "c", OFloat 3 )
                                             , ( "d", OFloat 4 )
                                             , ( "e", OFloat 5 )
+                                            ]
+                                        )
+                                    )
+                                |> addConstant "dict_test2"
+                                    (ODict
+                                        (Dict.fromList
+                                            [ ( "ab", OArray
+                                                       (Array.fromList
+                                                                 [ OFloat 1
+                                                                 , OFloat 2
+                                                                 , OFloat 3
+                                                                 ]
+                                                        )
+                                              )
+                                            , ( "xy", OArray
+                                                       (Array.fromList
+                                                                 [ OFloat 4
+                                                                 , OFloat 5
+                                                                 , OFloat 6
+                                                                 ]
+                                                        )
+                                              )
                                             ]
                                         )
                                     )
@@ -509,6 +582,7 @@ test_list1err = Array.fromList [
 
 ---------------------------------------------------------------------
 test_list2 = Array.fromList [  -- array 
+
     ( " [ 1,2,3,4,5] " ,
         OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3,OFloat 4,OFloat 5])  )
 
@@ -539,6 +613,50 @@ test_list2 = Array.fromList [  -- array
    ,( " array_string_test.sub(1,2)  ", 
         OArray (Array.fromList [OString "b__",OString "c__"])   )
 
+    -------------------------------------------------------2d array
+   ,( " [ [1,2],[3,4],[5,6]] " ,
+        OArray (Array.fromList [OArray (Array.fromList [OFloat 1,OFloat 2]),
+                                OArray (Array.fromList [OFloat 3,OFloat 4]),
+                                OArray (Array.fromList [OFloat 5,OFloat 6])])    )
+
+   ,( " [ [\"1\",\"2\"],[3,4],[5,6]] " ,
+        OArray (Array.fromList [OArray (Array.fromList [OString "1",OString "2"]),
+                                OArray (Array.fromList [OFloat 3,OFloat 4]),
+                                OArray (Array.fromList [OFloat 5,OFloat 6])])    )
+
+   ,( " array_test2d  ", 
+        OArray (Array.fromList [OArray (Array.fromList [OFloat 1,OFloat 2]),
+                                OArray (Array.fromList [OFloat 3,OFloat 4]),
+                                OArray (Array.fromList [OFloat 5,OFloat 6])])    )
+
+   ,( " array_test2d[1]  ", 
+                                OArray (Array.fromList [OFloat 3,OFloat 4])      )
+
+   ,( " array_test2d[1][1]  ", 
+                                OFloat 4      )
+
+   ,( " array_dict_test  ",   
+        OArray (Array.fromList 
+             [ODict (Dict.fromList [("a",OFloat 1),("b",OFloat 2),("c",OFloat 3)])
+             ,ODict (Dict.fromList [("a",OFloat 4),("b",OFloat 5),("c",OFloat 6)])
+             ]) )
+
+   ,( " array_dict_test[0] ", 
+             ODict (Dict.fromList [("a",OFloat 1),("b",OFloat 2),("c",OFloat 3)])
+              )
+
+   ,( " array_dict_test[1] ", 
+             ODict (Dict.fromList [("a",OFloat 4),("b",OFloat 5),("c",OFloat 6)])
+              )
+
+   ,( " array_dict_test[1].c ", 
+             OFloat 6 )
+              
+   ,( " array_dict_test[1]{\"c\"} ", 
+             OFloat 6 )
+
+   ,( " array_dict_test[index]{dict_index} ", 
+             OFloat 6 )
    ]
 
 test_list2err = Array.fromList [  -- array 
@@ -781,20 +899,67 @@ test_list3err = Array.fromList [  -- array slice
    ]
 
 test_list4 = Array.fromList [  -- dict
+
     ( " {\"ab\" : 1, \"xy\" : 2}   ", 
         ODict (Dict.fromList [("ab",OFloat 1),("xy",OFloat 2)])   )
 
    ,( " {\"ab\" : \"1\", \"xy\" : \"2\"}   ", 
         ODict (Dict.fromList [("ab",OString "1"),("xy",OString "2")])   )
 
-   ,( " {\"ab\" : [1.2.3], \"xy\" : [4,5,6]}   ", 
-        ODict (Dict.fromList [("ab",OString "1"),("xy",OString "2")])   )
+   ,( " {\"ab\" : [1,2,3], \"xy\" : [4,5,6]}   ", 
+        ODict (Dict.fromList [("ab",OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3])),
+                              ("xy",OArray (Array.fromList [OFloat 4,OFloat 5,OFloat 6]))
+                             ])   )
+
+--   ,( " {\"ab\" : [[1,2],[3,4]], \"xy\" : [[5,6],[7,8]]}   ", 
+--        ODict (Dict.fromList [("ab",OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3])),
+--                              ("xy",OArray (Array.fromList [OFloat 4,OFloat 5,OFloat 6]))
+--                             ])   )
+--
+
+   ,( " {\"ab\" : [\"A\",\"B\",\"C\"], \"xy\" : [\"D\",\"E\",\"F\"]}   ", 
+        ODict (Dict.fromList [("ab",OArray (Array.fromList [OString "A",OString "B",OString "C"])),
+                              ("xy",OArray (Array.fromList [OString "D",OString "E",OString "F"]))
+                             ])   )
+
+   ,( " {\"ab\" : [1,\"2\",3], \"xy\" : [4,\"5\",6]}   ", 
+        ODict (Dict.fromList [("ab",OArray (Array.fromList [OFloat 1,OString "2",OFloat 3])),
+                              ("xy",OArray (Array.fromList [OFloat 4,OString "5",OFloat 6]))
+                             ])   )
 
    ,( " dict_test.c   ", 
         OFloat 3   )
 
    ,( " dict_test{\"c\"}  ", 
         OFloat 3   )
+
+   ,( " dict_test{dict_index}  ", 
+        OFloat 3   )
+
+
+   ,( " dict_test2  ", 
+        ODict (Dict.fromList [("ab",OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3])),
+                              ("xy",OArray (Array.fromList [OFloat 4,OFloat 5,OFloat 6]))
+                             ])   )
+   ,( " dict_test2.xy   ", 
+        OArray (Array.fromList [OFloat 4,OFloat 5,OFloat 6])   )
+
+   ,( " dict_test2{\"xy\"}   ", 
+        OArray (Array.fromList [OFloat 4,OFloat 5,OFloat 6])   )
+
+   ---------------------------------- ToDo
+
+   ,( " dict_test2.xy[1]   ", 
+        OFloat 5   )
+
+   ,( " dict_test2{\"xy\"}[1]   ", 
+        OFloat 5   )
+
+   ,( " dict_test2.xy[index]   ", 
+        OFloat 5   )
+
+   ,( " dict_test2{dict_index2}[1 + index]   ", 
+        OFloat 6   )
    ]
 
 findstr1 = "A(BC)"

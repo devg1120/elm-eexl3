@@ -50,16 +50,10 @@ type Expr
     | Variable String
     | Function String (List Expr)
     | ArrayIndex String Expr
-    --
-    | ArrayIndexDictLookUp String Expr String
-    | ArrayIndexDictIndex String Expr Expr
-    --
-    | Array2dIndex String Expr Expr
     | ArraySlice String ( Expr, Expr )
     | DictLookUp String String
-    | DictLookUpArray String String Expr
+    --| DictIndex String String
     | DictIndex String Expr
-    | DictIndexArray String Expr Expr
     | VariableMethod String String (List Expr)
     | Add Expr Expr --[+]  String Float
     | Sub Expr Expr --[-]  Float
@@ -678,176 +672,6 @@ evaluate userenv userfunc context expr =
                 _ ->
                     ExprErr "must Array/String"
 
-        ArrayIndexDictLookUp name index_expr dict_key ->
-            let
-                array_ =
-                    getConstant name context
-
-                index_ =
-                    evaluate userenv userfunc context index_expr
-            in
-            case array_ of
-                Just a ->
-                    case a of
-                        OArray a_ ->
-                            case index_ of
-                                ExprOk (OFloat aa) ->
-                                    let
-                                        index =
-                                            floor aa
-
-                                        a2 =
-                                            Array.get index a_
-                                    in
-                                    case a2 of
-                                        Just (ODict a2_) ->
-                                            let
-                                               d2 = Dict.get dict_key a2_ 
-                                            in
-                                            case d2 of
-                                               Just a3_ ->
-                                                   ExprOk a3_
-                                               _ ->
-                                                  ExprErr ("not found key:" ++ dict_key)
-
-                                        _ ->
-                                            ExprErr ("out of index:" ++ String.fromInt index)
-
-                                ExprErr err ->
-                                    ExprErr ("out of index:" ++ err)
-
-                                _ ->
-                                    ExprErr "out of index: must Int/Float"
-
-                        _ ->
-                            ExprErr "must Array/String"
-
-                _ ->
-                    ExprErr "must Array/String"
-
-        ArrayIndexDictIndex name index_expr dict_key_expr ->
-            let
-                array_ =
-                    getConstant name context
-
-                index_ =
-                    evaluate userenv userfunc context index_expr
-                dict_key_ =
-                    evaluate userenv userfunc context dict_key_expr
-            in
-            case array_ of
-                Just a ->
-                    case a of
-                        OArray a_ ->
-                            case (index_,dict_key_) of
-                                (ExprOk (OFloat aa), ExprOk (OString key)) ->
-                                    let
-                                        index =
-                                            floor aa
-
-                                        a2 =
-                                            Array.get index a_
-                                    in
-                                    case a2 of
-                                        Just (ODict a2_) ->
-                                            case (Dict.get key a2_ ) of
-                                               Just a3_ ->
-                                                   ExprOk a3_
-                                               _ ->
-                                                  ExprErr ("not found key:" ++ key)
-
-                                        _ ->
-                                            ExprErr ("out of index:" ++ String.fromInt index)
-
-                                (ExprErr err,_) ->
-                                    ExprErr ("out of index:" ++ err)
-
-                                (_,ExprErr err) ->
-                                    ExprErr ("out of index:" ++ err)
-
-                                _ ->
-                                    ExprErr "out of index: must Int/Float"
-
-                        _ ->
-                            ExprErr "must Array/String"
-
-                _ ->
-                    ExprErr "must Array/String"
-
-        Array2dIndex name index_expr1 index_expr2 ->
-            let
-                array_ =
-                    getConstant name context
-
-                index_ =
-                    evaluate userenv userfunc context index_expr1
-
-                index2_ =
-                    evaluate userenv userfunc context index_expr2
-
-                get2d arr ind =
-                                  case arr of
-                                      OArray a_ ->
-                                          case ind of
-                                              ExprOk (OFloat aa) ->
-                                                  let
-                                                      index =
-                                                          floor aa
-
-                                                      a2 =
-                                                          Array.get index a_
-                                                  in
-                                                  case a2 of
-                                                      Just a2_ ->
-                                                          ExprOk a2_
-
-                                                      _ ->
-                                                          ExprErr ("out of index:" ++ String.fromInt index)
-
-                                              ExprErr err ->
-                                                  ExprErr ("out of index:" ++ err)
-
-                                              _ ->
-                                                  ExprErr "out of index: must Int/Float"
-
-                                      _ ->
-                                          ExprErr "must Array/String"
-
-
-
-            in
-            case array_ of
-                Just a ->
-                    case a of
-                        OArray a_ ->
-                            case index_ of
-                                ExprOk (OFloat aa) ->
-                                    let
-                                        index =
-                                            floor aa
-
-                                        a2 =
-                                            Array.get index a_
-                                    in
-                                    case a2 of
-                                        Just a2_ ->
-                                            --ExprOk a2_
-                                            get2d a2_ index2_
-
-                                        _ ->
-                                            ExprErr ("out of index:" ++ String.fromInt index)
-
-                                ExprErr err ->
-                                    ExprErr ("out of index:" ++ err)
-
-                                _ ->
-                                    ExprErr "out of index: must Int/Float"
-
-                        _ ->
-                            ExprErr "must Array/String"
-
-                _ ->
-                    ExprErr "must Array/String"
 
         ArraySlice name pair_expr ->
             let
@@ -958,64 +782,6 @@ evaluate userenv userfunc context expr =
             in
             ExprOk ans
 
-        DictLookUpArray name key index_ ->
-            let
-                dict_ =
-                    getConstant name context
-
-                index2 = evaluate userenv userfunc context index_
-
-                getArray arr ind =
-                                  case arr of
-                                      OArray a_ ->
-                                          case ind of
-                                              ExprOk (OFloat aa) ->
-                                                  let
-                                                      index =
-                                                          floor aa
-
-                                                      a2 =
-                                                          Array.get index a_
-                                                  in
-                                                  case a2 of
-                                                      Just a2_ ->
-                                                          ExprOk a2_
-
-                                                      _ ->
-                                                          ExprErr ("out of index:" ++ String.fromInt index)
-
-                                              ExprErr err ->
-                                                  ExprErr ("out of index:" ++ err)
-
-                                              _ ->
-                                                  ExprErr "out of index: must Int/Float"
-
-                                      _ ->
-                                          ExprErr "must Array"
-                in
-                    case dict_ of
-                        Just d ->
-                            case d of
-                                ODict d_ ->
-                                    let
-                                        d2 =
-                                            Dict.get key d_
-                                    in
-                                    case d2 of
-                                        Just d2_ ->
-                                            --d2_
-                                            getArray d2_ index2
-
-
-                                        _ ->
-                                            ExprErr " !!not_found dictlookup"
-
-                                _ ->
-                                    ExprErr " !!not_found dict lookup"
-
-                        _ ->
-                            ExprErr " !!not_found dict lookup"
-
         DictIndex name key_ ->
             let
                 dict_ =
@@ -1051,69 +817,6 @@ evaluate userenv userfunc context expr =
                             OString " !!not_found dictIndex"
             in
             ExprOk ans
-
-        DictIndexArray name key_ index_ ->
-            let
-                dict_ =
-                    getConstant name context
-
-                key2 = evaluate userenv userfunc context key_
-                key = case key2 of
-                              ExprOk (OString d) ->
-                                        d
-                              _ ->
-                                        "N/A"
-                index2 = evaluate userenv userfunc context index_
-
-                getArray arr ind =
-                                  case arr of
-                                      OArray a_ ->
-                                          case ind of
-                                              ExprOk (OFloat aa) ->
-                                                  let
-                                                      index =
-                                                          floor aa
-
-                                                      a2 =
-                                                          Array.get index a_
-                                                  in
-                                                  case a2 of
-                                                      Just a2_ ->
-                                                          ExprOk a2_
-
-                                                      _ ->
-                                                          ExprErr ("out of index:" ++ String.fromInt index)
-
-                                              ExprErr err ->
-                                                  ExprErr ("out of index:" ++ err)
-
-                                              _ ->
-                                                  ExprErr "out of index: must Int/Float"
-
-                                      _ ->
-                                          ExprErr "must Array"
-                in
-                    case dict_ of
-                        Just d ->
-                            case d of
-                                ODict d_ ->
-                                    let
-                                        d2 =
-                                            Dict.get key d_
-                                    in
-                                    case d2 of
-                                        Just d2_ ->
-                                            --d2_
-                                            getArray d2_ index2
-
-                                        _ ->
-                                            ExprErr " !!not_found dictIndex"
-
-                                _ ->
-                                    ExprErr " !!not_found dictIndex"
-
-                        _ ->
-                            ExprErr " !!not_found dictIndex"
 
         String s ->
             ExprOk (OString s)
@@ -2156,71 +1859,6 @@ array_index =
                 succeed (ArrayIndex name index)
             )
 
-array_index_dict_lookup : Parser Expr
-array_index_dict_lookup =
-    succeed ArrayIndexDictLookUp
-        |= variable
-            { start = Char.isLower
-            , inner = \c -> Char.isAlphaNum c || c == '_'
-            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
-            }
-        |. symbol "["
-        |= expression3
-        |. symbol "]"
-        |. symbol "."
-        |= variable
-            { start = Char.isLower
-            , inner = \c -> Char.isAlphaNum c || c == '_'
-            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
-            }
-
-array_index_dict_index : Parser Expr
-array_index_dict_index =
-    succeed ArrayIndexDictIndex
-        |= variable
-            { start = Char.isLower
-            , inner = \c -> Char.isAlphaNum c || c == '_'
-            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
-            }
-        |. symbol "["
-        |= expression3
-        |. symbol "]"
-        |. symbol "{"
-        |= expression4
-        |. symbol "}"
-
-
-array2d_index : Parser Expr
-array2d_index =
-    --succeed Tuple.pair
-    --succeed (String,(Expr,Expr))
-    succeed Array2dIndex
-        |= variable
-            { start = Char.isLower
-            , inner = \c -> Char.isAlphaNum c || c == '_'
-            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
-            }
-        |. symbol "["
-        |= expression3
-        |. symbol "]"
-        |. symbol "["
-        |= expression3
-        |. symbol "]"
-      --  |> andThen
-      --      (\ name index1 index2  ->
-      --          succeed (Array2dIndex name index1 index2)
-      --      )
-            ----(\( name, index1, index2 ) ->
-            --(\  args ->
-            --    let
-            --        arr_ = Array.fromList args
-            --        name   = Array.get 2 arr_
-            --        index1 = Array.get 1 arr_
-            --        index2 = Array.get 0 arr_
-            --    in
-            --    succeed (Array2dIndex name index1 index2)
-            -- )
-
 
 slice : Parser ( Expr, Expr )
 slice =
@@ -2293,24 +1931,6 @@ dict_lookup =
                 succeed (DictLookUp name key)
             )
 
-dict_lookup_array : Parser Expr
-dict_lookup_array =
-    succeed DictLookUpArray
-        |= variable
-            { start = Char.isLower
-            , inner = \c -> Char.isAlphaNum c || c == '_'
-            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "var", "def", "return", "break", "continue" ]
-            }
-        |. symbol "."
-        |= variable
-            { start = Char.isLower
-            , inner = \c -> Char.isAlphaNum c || c == '_'
-            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
-            }
-        |. symbol "["
-        |= expression3
-        |. symbol "]"
-
 
 dict_index : Parser Expr
 dict_index =
@@ -2329,21 +1949,6 @@ dict_index =
                 succeed (DictIndex name key)
             )
 
-dict_index_array : Parser Expr
-dict_index_array =
-    succeed DictIndexArray
-        |= variable
-            { start = Char.isLower
-            , inner = \c -> Char.isAlphaNum c || c == '_'
-            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "let", "fn", "return", "break", "continue" ]
-            }
-        |. symbol "{"
-        --|= string
-        |= expression4
-        |. symbol "}"
-        |. symbol "["
-        |= expression3
-        |. symbol "]"
 
 variable_method : Parser Expr
 variable_method =
@@ -2454,14 +2059,9 @@ term =
             , backtrackable dict
             , backtrackable func
             , backtrackable array_slice
-            , backtrackable array2d_index
-            , backtrackable array_index_dict_lookup
-            , backtrackable array_index_dict_index
             , backtrackable array_index
             , backtrackable variable_method
-            , backtrackable dict_lookup_array
             , backtrackable dict_lookup
-            , backtrackable dict_index_array
             , backtrackable dict_index
             , backtrackable default
             , backtrackable typevar
@@ -2512,7 +2112,6 @@ term2 =
             , backtrackable dict
 
             --, backtrackable func
-            , backtrackable array2d_index
             , backtrackable array_index
             , backtrackable dict_lookup
             , backtrackable dict_index
