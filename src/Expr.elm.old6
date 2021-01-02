@@ -1144,30 +1144,9 @@ evaluate userenv userfunc context expr =
                             OString n
 
                         AvVar n ->
-                            --OString n
-                            --evaluate userenv userfunc context n
-                            let
-                                value =
-                                    getConstant n context
-                            in
-                            case value of
-                                    Just v_ ->
-                                        v_
-                                    _ ->
-                                        OString (" AvVar not_found:" ++ n)
+                            OString n
 
-                        AvExpr n ->
-                            --OString n
-                            let
-                               r = evaluate userenv userfunc context n
-                            in
-                            case r of
-                               (ExprOk r_) ->
-                                           r_
-                               (_) ->
-                                          OString  "err"
-
-                        AvArray n ->                  -- Array2d
+                        AvArray n ->
                             let
                                func_ a = 
                                   case a of
@@ -1177,29 +1156,9 @@ evaluate userenv userfunc context expr =
                                           OFloat (toFloat a_)
                                      AvFloat a_ ->
                                           OFloat a_
-                                     AvVar n_ ->
-                                         let
-                                             value =
-                                                 getConstant n_ context
-                                         in
-                                         case value of
-                                                 Just v_ ->
-                                                     v_
-                                                 _ ->
-                                                     OString (" AvVar not_found:" ++ n_)
-
-                                     AvExpr n_ ->
-                                         let
-                                            r = evaluate userenv userfunc context n_
-                                         in
-                                         case r of
-                                            (ExprOk r_) ->
-                                                        r_
-                                            (_) ->
-                                                       OString  "err"
                                      _ ->
-                                         --OString "DEF"
-                                         OString (Debug.toString a)
+                                          --OString "DEF"
+                                          OString (Debug.toString a)
                             in
                             OArray (Array.map func_ n)
 
@@ -1281,17 +1240,6 @@ evaluate userenv userfunc context expr =
                                         OString (" AvVar not_found:" ++ n)
 
 
-                        AvExpr n ->
-                            --OString n
-                            let
-                               r = evaluate userenv userfunc context n
-                            in
-                            case r of
-                               (ExprOk r_) ->
-                                           r_
-                               (_) ->
-                                          OString  "err"
-
                         AvArray n ->
                             let
                                func_ a = 
@@ -1302,70 +1250,45 @@ evaluate userenv userfunc context expr =
                                           OFloat (toFloat a_)
                                      AvFloat a_ ->
                                           OFloat a_
-                                     AvVar n_ ->
-                                         let
-                                             value =
-                                                 getConstant n_ context
-                                         in
-                                         case value of
-                                                 Just v_ ->
-                                                     v_
-                                                 _ ->
-                                                     OString (" AvVar not_found:" ++ n_)
-
-                                     AvExpr n_ ->
-                                         let
-                                            r = evaluate userenv userfunc context n_
-                                         in
-                                         case r of
-                                            (ExprOk r_) ->
-                                                        r_
-                                            (_) ->
-                                                       OString  "err"
---------------------------------------------------------
-                                     AvArray n_2 ->
-                                         let
-                                            func_2 a2 = 
-                                               case a2 of
-                                                  AvString a_ ->
-                                                       OString a_
-                                                  AvInt a_ ->
-                                                       OFloat (toFloat a_)
-                                                  AvFloat a_ ->
-                                                       OFloat a_
-                                                  AvVar n_ ->
-                                                      let
-                                                          value =
-                                                              getConstant n_ context
-                                                      in
-                                                      case value of
-                                                              Just v_ ->
-                                                                  v_
-                                                              _ ->
-                                                                  OString (" AvVar not_found:" ++ n_)
-
-                                                  AvExpr n_ ->
-                                                      let
-                                                         r = evaluate userenv userfunc context n_
-                                                      in
-                                                      case r of
-                                                         (ExprOk r_) ->
-                                                                     r_
-                                                         (_) ->
-                                                                    OString  "err"
-
-                                                  _ ->
-                                                      --OString "DEF"
-                                                      OString (Debug.toString a)
-                                      in
-                                      OArray (Array.map func_2 n_2)
---------------------------------------------------------
                                      _ ->
-                                         --OString "DEF"
-                                         OString (Debug.toString a)
+                                          OString (Debug.toString a)
                             in
                             OArray (Array.map func_ n)
 
+--                        AvArrayInt n ->
+--                            let
+--                               func_ a = OFloat (toFloat a)
+--                            in
+--                            OArray (Array.map func_ n)
+--
+--                        AvArrayBool n ->
+--                            let
+--                               func_ a = OBool a
+--                            in
+--                            OArray (Array.map func_ n)
+--
+--                        AvArrayFloat n ->
+--                            let
+--                               func_ a = OFloat a
+--                            in
+--                            OArray (Array.map func_ n)
+--
+--                        AvArrayString n ->
+--                            let
+--                               func_ a = OString a
+--                            in
+--                            OArray (Array.map func_ n)
+--
+--                        AvArrayDict n ->
+--                            let
+--                               func_ a = 
+--                                    let
+--                                      cnv k_ v_ =  OString v_
+--                                    in
+--                                    ODict (Dict.map cnv a)
+--                            in
+--                            OArray (Array.map func_ n)
+--
                         AvDict n ->
                             let
                                func_ k2 v2 = 
@@ -1818,14 +1741,11 @@ arrayValues =
     succeed (::)
         |. spaces
         |= oneOf
-            [ backtrackable exprValue
-            , backtrackable stringValue
+            [ backtrackable stringValue
             , backtrackable intValue
             , backtrackable floatValue
             , backtrackable array2d
             , varValue
-            --, backtrackable varValue
-            --, exprValue
             ]
         |. spaces
         |= arrayValuesTail
@@ -1842,14 +1762,11 @@ arrayValuesTail =
             |. symbol ","
             |. spaces
             |= oneOf
-                [ backtrackable exprValue
-                , backtrackable stringValue
+                [ backtrackable stringValue
                 , backtrackable intValue
                 , backtrackable floatValue
                 , backtrackable array2d
                 , varValue
-                --, backtrackable varValue
-                --, exprValue
                 ]
             |. spaces
             |= lazy (\_ -> arrayValuesTail)
@@ -1877,8 +1794,7 @@ array2dValues =
     succeed (::)
         |. spaces
         |= oneOf
-            [ backtrackable exprValue
-            , backtrackable stringValue
+            [ backtrackable stringValue
             , backtrackable intValue
             , backtrackable floatValue
             , varValue
@@ -1898,8 +1814,7 @@ array2dValuesTail =
             |. symbol ","
             |. spaces
             |= oneOf
-                [ backtrackable exprValue
-                , backtrackable stringValue
+                [ backtrackable stringValue
                 , backtrackable intValue
                 , backtrackable floatValue
                 , varValue
@@ -1930,11 +1845,9 @@ arrayValues2 =
     succeed (::)
         |. spaces
         |= oneOf
-            [ backtrackable exprValue
-            , backtrackable stringValue
+            [ backtrackable stringValue
             , backtrackable intValue
             , backtrackable floatValue
-            , backtrackable array2d
             , varValue
             ]
         |. spaces
@@ -1952,11 +1865,9 @@ arrayValuesTail2 =
             |. symbol ","
             |. spaces
             |= oneOf
-                [ backtrackable exprValue
-                , backtrackable stringValue
+                [ backtrackable stringValue
                 , backtrackable intValue
                 , backtrackable floatValue
-                , backtrackable array2d
                 , varValue
                 ]
             |. spaces
@@ -2008,8 +1919,7 @@ dictKV =
         |. symbol ":"
         |. spaces
         |= oneOf
-            [ backtrackable exprValue
-            , backtrackable stringValue
+            [ backtrackable stringValue
             , backtrackable intValue
             , backtrackable floatValue
             , backtrackable arrayValue
@@ -2055,7 +1965,6 @@ type ArgValue
     | AvFloat Float
     | AvString String
     | AvVar String
-    | AvExpr Expr --
     | AvArray (Array.Array ArgValue)
     --| AvArrayInt (Array.Array Int)
     --| AvArrayBool (Array.Array Bool)
@@ -2110,24 +2019,6 @@ floatValue =
             (\arg ->
                 succeed (AvFloat (arg |> Maybe.withDefault 0.0))
             )
-
---exprValue : Parser ArgValue
---exprValue =
---    succeed Just
---        |. spaces
---        |= expression5
---        |. spaces
---        |> andThen
---            (\arg ->
---                succeed (AvExpr (arg |> Maybe.withDefault 0.0))
---            )
-
-exprValue : Parser ArgValue
-exprValue =
-    succeed AvExpr
-        |. spaces
-        |= expression5
-        |. spaces
 
 arrayValue : Parser ArgValue
 arrayValue =
@@ -2772,56 +2663,6 @@ expressionHelp4 revOps expr =
         , lazy (\_ -> succeed (finalize revOps expr))
         ]
 
-
------------------------------------------------------------
-
-
-term5 : Parser Expr
-term5 =
-    succeed (\a -> a)
-        |. spaces
-        |= oneOf
-            --[ digits
-            [ backtrackable string
-            --, backtrackable array
-            --, backtrackable dict
-
-            --, backtrackable func
-            --, backtrackable array_index
-            --, backtrackable dict_lookup
-            --, backtrackable dict_index
-            --, backtrackable default
-            , backtrackable typevar
-            , backtrackable negdigits
-            , backtrackable digits
-            , bool
-            , succeed identity
-                |. symbol "("
-                |. spaces
-                |= lazy (\_ -> expression5)
-                |. spaces
-                |. symbol ")"
-            ]
-        |. spaces
-
-
-expression5 : Parser Expr
-expression5 =
-    term5
-        |> andThen (expressionHelp5 [])
-
-
-expressionHelp5 : List ( Expr, Operator ) -> Expr -> Parser Expr
-expressionHelp5 revOps expr =
-    oneOf
-        [ succeed Tuple.pair
-            |. spaces
-            |= operator
-            |. spaces
-            |= term4
-            |> andThen (\( op, newExpr ) -> expressionHelp5 (( expr, op ) :: revOps) newExpr)
-        , lazy (\_ -> succeed (finalize revOps expr))
-        ]
 
 -----------------------------------------------------------
 
