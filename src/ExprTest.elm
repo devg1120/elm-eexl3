@@ -331,6 +331,30 @@ exprexec2 str =
                                             ]
                                         )
                                     )
+                                |> addConstant "array_dict_test2"
+                                    (OArray
+                                        (Array.fromList
+                                            [ODict  (Dict.fromList
+                                                        [ ("a", OFloat 1)
+                                                        , ("b", OFloat 2)
+                                                        , ("c", OFloat 3)
+                                                        ]
+                                                    )
+                                            ,ODict  (Dict.fromList
+                                                        [ ("a", OFloat 4)
+                                                        , ("b", OFloat 5)
+                                                        , ("c", OFloat 6)
+                                                        ]
+                                                    )
+                                            ,ODict  (Dict.fromList
+                                                        [ ("a", OFloat 7)
+                                                        , ("b", OFloat 8)
+                                                        , ("c", OFloat 9)
+                                                        ]
+                                                    )
+                                            ]
+                                        )
+                                    )
                                 |> addConstant "index" (OFloat 1)
                                 |> addConstant "dict_index" (OString "c")
                                 |> addConstant "dict_index2" (OString "xy")
@@ -696,6 +720,27 @@ test_list2 = Array.fromList [  -- array
 
    ,( " array_dict_test[index]{dict_index} ", 
              OFloat 6 )
+
+   ,( " array_dict_test2  ",   
+        OArray (Array.fromList 
+             [ODict (Dict.fromList [("a",OFloat 1),("b",OFloat 2),("c",OFloat 3)])
+             ,ODict (Dict.fromList [("a",OFloat 4),("b",OFloat 5),("c",OFloat 6)])
+             ,ODict (Dict.fromList [("a",OFloat 7),("b",OFloat 8),("c",OFloat 9)])
+             ]) )
+
+   ,( " [{\"a\" : 1, \"b\" : 2, \"c\" :3 }, {\"a\" : 4, \"b\" : 5, \"c\" :6 },{\"a\" : 7, \"b\" : 8, \"c\" :9 }] ", 
+        OArray (Array.fromList 
+             [ODict (Dict.fromList [("a",OFloat 1),("b",OFloat 2),("c",OFloat 3)])
+             ,ODict (Dict.fromList [("a",OFloat 4),("b",OFloat 5),("c",OFloat 6)])
+             ,ODict (Dict.fromList [("a",OFloat 7),("b",OFloat 8),("c",OFloat 9)])
+             ]) )
+
+   ,( " [{\"a\" : test1, \"b\" : 2+1, \"c\" :3 }, {\"a\" : 4, \"b\" : 5, \"c\" :6 },{\"a\" : 7, \"b\" : 8, \"c\" :9 }] ", 
+        OArray (Array.fromList 
+             [ODict (Dict.fromList [("a",OString "OKOK"),("b",OFloat 3),("c",OFloat 3)])
+             ,ODict (Dict.fromList [("a",OFloat 4),("b",OFloat 5),("c",OFloat 6)])
+             ,ODict (Dict.fromList [("a",OFloat 7),("b",OFloat 8),("c",OFloat 9)])
+             ]) )
    ]
 
 test_list2err = Array.fromList [  -- array 
@@ -964,14 +1009,22 @@ test_list4 = Array.fromList [  -- dict
    ,( " {\"ab\" : test4, \"xy\" : abc }   ", 
         ODict (Dict.fromList [("ab",OString "err"),("xy",OString "_ABCD_")])   )
 
---   ,( " {\"ab\" : [[1,2],[3,4]], \"xy\" : [[5,6],[7,8]]}   ", 
---        ODict (Dict.fromList [("ab",OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3])),
---                              ("xy",OArray (Array.fromList [OFloat 4,OFloat 5,OFloat 6]))
---                             ])   )
---
 
    ,( " {\"ab\" : [[1,2],[3,4]], \"xy\" : [[5,6],[7,8]]}   ", 
         ODict (Dict.fromList [("ab",OArray (Array.fromList [OArray (Array.fromList [OFloat 1,OFloat 2])
+                                                           ,OArray (Array.fromList [OFloat 3,OFloat 4])
+                                                           ]
+                                              )
+                              )
+                             ,("xy",OArray (Array.fromList [OArray (Array.fromList [OFloat 5,OFloat 6])
+                                                           ,OArray (Array.fromList [OFloat 7,OFloat 8])
+                                                           ]
+                                              )  
+                              )
+                              ]) )
+
+   ,( " {\"ab\" : [[1+1,2],[3,4]], \"xy\" : [[5,6],[7,8]]}   ", 
+        ODict (Dict.fromList [("ab",OArray (Array.fromList [OArray (Array.fromList [OFloat 2,OFloat 2])
                                                            ,OArray (Array.fromList [OFloat 3,OFloat 4])
                                                            ]
                                               )

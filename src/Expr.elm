@@ -132,7 +132,7 @@ dicSetUpdate name value stackdic =
         ( dict1, stack_ ) =
             Stack.pop stackdic
 
-        dict2 =
+        dict_2 =
             case dict1 of
                 Just dict_ ->
                     dict_
@@ -141,13 +141,13 @@ dicSetUpdate name value stackdic =
                     Dict.empty
 
         value2 =
-            Dict.get name dict2
+            Dict.get name dict_2
     in
     case value2 of
         Just a ->
             let
                 tmp_dict =
-                    Dict.insert name value dict2
+                    Dict.insert name value dict_2
             in
             Ok (Stack.push tmp_dict stack_)
 
@@ -166,7 +166,7 @@ dicSetUpdate name value stackdic =
                 in
                 case new_stack_pair of
                     Ok new_stack_ ->
-                        Ok (Stack.push dict2 new_stack_)
+                        Ok (Stack.push dict_2 new_stack_)
 
                     Err str ->
                         Err str
@@ -187,7 +187,7 @@ dicSetNewLocal name value stackdic =
         ( dict1, stack_ ) =
             Stack.pop stackdic
 
-        dict2 =
+        dict_2 =
             case dict1 of
                 Just dict_ ->
                     dict_
@@ -196,7 +196,7 @@ dicSetNewLocal name value stackdic =
                     Dict.empty
 
         value2 =
-            Dict.insert name value dict2
+            Dict.insert name value dict_2
     in
     Stack.push value2 stack_
 
@@ -1203,48 +1203,40 @@ evaluate userenv userfunc context expr =
                             in
                             OArray (Array.map func_ n)
 
---                        AvArrayInt n ->
---                            let
---                               func_ a = OFloat (toFloat a)
---                            in
---                            OArray (Array.map func_ n)
---
---                        AvArrayBool n ->
---                            let
---                               func_ a = OBool a
---                            in
---                            OArray (Array.map func_ n)
---
---                        AvArrayFloat n ->
---                            let
---                               func_ a = OFloat a
---                            in
---                            OArray (Array.map func_ n)
---
---                        AvArrayString n ->
---                            let
---                               func_ a = OString a
---                            in
---                            OArray (Array.map func_ n)
---
---                        AvArrayDict n ->
---                            let
---                               func_ a = 
---                                    let
---                                      cnv k v  =  OString v
---                                    in
---                                    ODict (Dict.map cnv a)
---                            in
---                            OArray (Array.map func_ n)
---
+                        --AvDict n ->
+                        --    let
+                        --       func_ k2 v2 = 
+                        --                OString v2
+
+                        --    in
+                        --    ODict (Dict.map func_ n)
+
                         AvDict n ->
                             let
                                func_ k2 v2 = 
-                                        OString v2
+                                     case v2 of
+                                        AvString s ->
+                                             OString s
+                                        AvInt s ->
+                                             OFloat (toFloat s)
+                                        AvFloat s ->
+                                             OFloat s
+
+                                        AvExpr s ->
+                                             let
+                                                r = evaluate userenv userfunc context s
+                                             in
+                                             case r of
+                                                (ExprOk r_) ->
+                                                            r_
+                                                (_) ->
+                                                           OString  "err"
+                                        _ ->
+                                             --OString "err"
+                                             OString ("err:" ++ Debug.toString v2)
 
                             in
                             ODict (Dict.map func_ n)
-
 
                 arr2 =
                     Array.map conv an
@@ -1366,14 +1358,39 @@ evaluate userenv userfunc context expr =
                             in
                             OArray (Array.map func_ n)
 
+                        --AvDict n ->
+                        --    let
+                        --       func_ k2 v2 = 
+                        --                OString v2
+
+                        --    in
+                        --    ODict (Dict.map func_ n)
+
                         AvDict n ->
                             let
                                func_ k2 v2 = 
-                                        OString v2
+                                     case v2 of
+                                        AvString s ->
+                                             OString s
+                                        AvInt s ->
+                                             OFloat (toFloat s)
+                                        AvFloat s ->
+                                             OFloat s
+
+                                        AvExpr s ->
+                                             let
+                                                r = evaluate userenv userfunc context s
+                                             in
+                                             case r of
+                                                (ExprOk r_) ->
+                                                            r_
+                                                (_) ->
+                                                           OString  "err"
+                                        _ ->
+                                             OString ("err:" ++ Debug.toString v2)
 
                             in
                             ODict (Dict.map func_ n)
-
 
                 dt2 =
                     Dict.map conv dt
@@ -1822,7 +1839,9 @@ arrayValues =
             , backtrackable stringValue
             , backtrackable intValue
             , backtrackable floatValue
+            , backtrackable dict2
             , backtrackable array2d
+            --, backtrackable dict2
             , varValue
             --, backtrackable varValue
             --, exprValue
@@ -1846,7 +1865,9 @@ arrayValuesTail =
                 , backtrackable stringValue
                 , backtrackable intValue
                 , backtrackable floatValue
+                , backtrackable dict2
                 , backtrackable array2d
+                --, backtrackable dict2
                 , varValue
                 --, backtrackable varValue
                 --, exprValue
@@ -1968,7 +1989,6 @@ arrayValuesTail2 =
 
 ---------------------------------------------
 
-
 dict : Parser Expr
 dict =
     succeed Tuple.pair
@@ -2042,6 +2062,82 @@ dictValuesTail =
         , succeed []
         ]
 
+---------------------------------------------
+
+dict2 : Parser ArgValue
+dict2 =
+    succeed Tuple.pair
+        |. backtrackable (symbol "{")
+        |= dictValues2
+        |= symbol "}"
+        |> andThen
+            (\( arg, a ) ->
+                let
+                    base =
+                        Dict.fromList arg
+                in
+                succeed (AvDict base)
+            )
+
+
+dictKey2 : Parser String
+dictKey2 =
+    succeed Just
+        |. spaces
+        |. symbol "\""
+        |= getChompedString (chompWhile (\c -> c /= '"'))
+        |. symbol "\""
+        |. spaces
+        |> andThen
+            (\arg ->
+                --succeed (AvString (arg   |> Maybe.withDefault "" ))
+                succeed (arg |> Maybe.withDefault "")
+            )
+
+
+dictKV2 : Parser ( String, ArgValue )
+dictKV2 =
+    succeed (\k v -> ( k, v ))
+        |. spaces
+        |= dictKey2
+        |. symbol ":"
+        |. spaces
+        |= oneOf
+            [ backtrackable exprValue
+            , backtrackable stringValue
+            , backtrackable intValue
+            , backtrackable floatValue
+            , backtrackable arrayValue
+            , varValue
+            ]
+
+
+dictValues2 : Parser (List ( String, ArgValue ))
+dictValues2 =
+    succeed (::)
+        |. spaces
+        |= dictKV2
+        |. spaces
+        |= dictValuesTail2
+        |> andThen
+            (\arg ->
+                succeed arg
+            )
+
+
+dictValuesTail2 : Parser (List ( String, ArgValue ))
+dictValuesTail2 =
+    oneOf
+        [ succeed (::)
+            |. symbol ","
+            |. spaces
+            |= dictKV2
+            |. spaces
+            |= lazy (\_ -> dictValuesTail2)
+        , succeed []
+        ]
+
+----------------------------------------------
 
 
 ----------------------------------------------------------
@@ -2057,12 +2153,8 @@ type ArgValue
     | AvVar String
     | AvExpr Expr --
     | AvArray (Array.Array ArgValue)
-    --| AvArrayInt (Array.Array Int)
-    --| AvArrayBool (Array.Array Bool)
-    --| AvArrayFloat (Array.Array Float)
-    --| AvArrayString (Array.Array String)
-    --| AvArrayDict (Array.Array (Dict String String))
-    | AvDict (Dict String String)
+    --| AvDict (Dict String String)
+    | AvDict (Dict String ArgValue)
 
 
 type alias Input =
