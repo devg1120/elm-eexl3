@@ -1222,6 +1222,43 @@ evaluate userenv userfunc context expr =
                                         AvFloat s ->
                                              OFloat s
 
+                                        AvArray s -> -- ADD
+                                             let
+                                                func_2 a = 
+                                                   case a of
+                                                      AvString a_ ->
+                                                           OString a_
+                                                      AvInt a_ ->
+                                                           OFloat (toFloat a_)
+                                                      AvFloat a_ ->
+                                                           OFloat a_
+                                                      AvVar n_ ->
+                                                          let
+                                                              value =
+                                                                  getConstant n_ context
+                                                          in
+                                                          case value of
+                                                                  Just v_ ->
+                                                                      v_
+                                                                  _ ->
+                                                                      OString (" AvVar not_found:" ++ n_)
+
+                                                      AvExpr n_ ->
+                                                          --OString n
+                                                          let
+                                                             r = evaluate userenv userfunc context n_
+                                                          in
+                                                          case r of
+                                                             (ExprOk r_) ->
+                                                                         r_
+                                                             (_) ->
+                                                                         OString  "err"
+
+                                                      _ ->
+                                                           OString (Debug.toString a)
+                                             in
+                                             OArray (Array.map func_2 s)
+
                                         AvExpr s ->
                                              let
                                                 r = evaluate userenv userfunc context s
@@ -1233,7 +1270,7 @@ evaluate userenv userfunc context expr =
                                                            OString  "err"
                                         _ ->
                                              --OString "err"
-                                             OString ("err:" ++ Debug.toString v2)
+                                             OString ("err1:" ++ Debug.toString v2)
 
                             in
                             ODict (Dict.map func_ n)
@@ -1377,6 +1414,43 @@ evaluate userenv userfunc context expr =
                                         AvFloat s ->
                                              OFloat s
 
+                                        AvArray s -> -- ADD
+                                             let
+                                                func_2 a = 
+                                                   case a of
+                                                      AvString a_ ->
+                                                           OString a_
+                                                      AvInt a_ ->
+                                                           OFloat (toFloat a_)
+                                                      AvFloat a_ ->
+                                                           OFloat a_
+                                                      AvVar n_ ->
+                                                          let
+                                                              value =
+                                                                  getConstant n_ context
+                                                          in
+                                                          case value of
+                                                                  Just v_ ->
+                                                                      v_
+                                                                  _ ->
+                                                                      OString (" AvVar not_found:" ++ n_)
+
+                                                      AvExpr n_ ->
+                                                          --OString n
+                                                          let
+                                                             r = evaluate userenv userfunc context n_
+                                                          in
+                                                          case r of
+                                                             (ExprOk r_) ->
+                                                                         r_
+                                                             (_) ->
+                                                                         OString  "err"
+
+                                                      _ ->
+                                                           OString (Debug.toString a)
+                                             in
+                                             OArray (Array.map func_2 s)
+
                                         AvExpr s ->
                                              let
                                                 r = evaluate userenv userfunc context s
@@ -1387,7 +1461,7 @@ evaluate userenv userfunc context expr =
                                                 (_) ->
                                                            OString  "err"
                                         _ ->
-                                             OString ("err:" ++ Debug.toString v2)
+                                             OString ("err2:" ++ Debug.toString v2)
 
                             in
                             ODict (Dict.map func_ n)

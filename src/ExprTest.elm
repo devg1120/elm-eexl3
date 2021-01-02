@@ -741,6 +741,15 @@ test_list2 = Array.fromList [  -- array
              ,ODict (Dict.fromList [("a",OFloat 4),("b",OFloat 5),("c",OFloat 6)])
              ,ODict (Dict.fromList [("a",OFloat 7),("b",OFloat 8),("c",OFloat 9)])
              ]) )
+
+   ,( " [{\"a\" : test1, \"b\" : 2+1, \"c\" :[1,2,3] }, {\"a\" : 4, \"b\" : 5, \"c\" :6 },{\"a\" : 7, \"b\" : 8, \"c\" :9 }] ", 
+        OArray (Array.fromList 
+             [ODict (Dict.fromList [("a",OString "OKOK"),("b",OFloat 3),
+                                    ("c",OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3]))])
+             ,ODict (Dict.fromList [("a",OFloat 4),("b",OFloat 5),("c",OFloat 6)])
+             ,ODict (Dict.fromList [("a",OFloat 7),("b",OFloat 8),("c",OFloat 9)])
+             ]) )
+
    ]
 
 test_list2err = Array.fromList [  -- array 
