@@ -85,6 +85,7 @@ type OutVal
     | OArray (Array.Array OutVal)
       --| ODict  (Dict OutVal OutVal)
     | ODict (Dict String OutVal)
+    | OEnum Int Int
 
 
 
