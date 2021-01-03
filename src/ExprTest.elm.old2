@@ -5,7 +5,6 @@ import Array
 import Dict
 
 import Parser exposing (..)
-import ExprTestApi exposing (..)
 
 ---------------------------------------------------------------------
 
@@ -81,6 +80,375 @@ test_strjoin context ar =
     OString ans
 -------------------------------------------------------------------------
 
+getStringIndex : String -> Int -> Int -> Int -> Int -> String
+getStringIndex mstr r c r_ c_ =
+     if  r < 1 || c < 1 then
+         "N/A row & col not negative"
+     else if r < r_ then
+         "N/A over col"
+     else if r == r_ && c == c_ then
+         String.left 1 mstr
+     else
+        let
+          char = String.left 1 mstr
+          (r_2 , c_2 )= if char == "\n" then
+                           (r_ + 1,   1)
+                        else
+                           (r_ , c_ + 1)
+
+
+          mstr2 = String.dropLeft 1 mstr 
+        in 
+        if mstr2 == "" then
+           "N/A over row"
+        else
+           getStringIndex mstr2 r c r_2 c_2
+
+stringIndex : String -> Int -> Int -> String
+stringIndex str_ r c =
+        getStringIndex str_ r c 1 1
+
+
+errAnalysis : String -> List DeadEnd -> String
+errAnalysis source err =
+            let
+               h = List.head err
+               --c = case  problem of
+               p = case  h of
+                     Just h_ ->
+                         let
+                            c = String.fromInt h_.col
+                            r = String.fromInt h_.row
+                            sc = stringIndex source h_.row h_.col 
+                         in
+                         case h_.problem of
+                              Expecting s ->
+                                "UnExpect " ++ r ++ ":" ++ c ++ " -> " ++ sc 
+                              ExpectingInt ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingHex ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingOctal ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingBinary ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingFloat ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingNumber ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingVariable ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingSymbol s ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingKeyword s ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              ExpectingEnd ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              UnexpectedChar ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              Problem s ->
+                                "unExpect:" ++ r ++ "-" ++ c
+                              BadRepeat ->
+                                "unExpect:" ++ r ++ "-" ++ c
+
+                     Nothing ->
+                         --Problem "nothing"
+                         "nothing"
+            in
+            p
+
+test_exprexec : String -> ExprResult String OutVal (String, (Array.Array ArgValue))
+test_exprexec str =
+    let
+        ast =
+            parse str
+
+        result =
+            case ast of
+                Err err ->
+                    --Debug.toString err
+                    --ExprErr "AST Error" (OString "err")
+                    --ExprErr ("+AST Error-" ++ (Debug.toString err) )
+                    ExprErr (errAnalysis str err )
+
+                Ok expr ->
+                    let
+                        context =
+                            empty
+                                |> addConstant "test1" (OString "OKOK")
+                                |> addConstant "abc" (OString "_ABCD_")
+                                |> addConstant "regex_test" (OString "123 ABC aas qdd A987 SDDFGG A666")
+                                |> addConstant "regex_test2" (OString " ABC aas qdd A SDDFGG A")
+                                |> addConstant "split_test" (OString "tom , 99, 90, 85 ")
+                                |> addConstant "findstr1" (OString "A(BC)")
+                                |> addConstant "findstr2" (OString "A(\\d\\d\\d)")
+                                |> addConstant "findstr3" (OString "(\\d\\d\\d)")
+                                |> addConstant "test_float" (OFloat 10.1)
+                                |> addConstant "test_bool"  (OBool  False)
+                                |> addConstant "array_test"
+                                    (OArray
+                                        (Array.fromList
+                                            [ OFloat 1
+                                            , OFloat 2
+                                            , OFloat 3
+                                            , OFloat 4
+                                            , OFloat 5
+                                            ]
+                                        )
+                                    )
+                                |> addConstant "array_test2d"
+                                    (OArray
+                                        (Array.fromList
+                                            [ OArray (Array.fromList [OFloat 1,OFloat 2])
+                                            , OArray (Array.fromList [OFloat 3,OFloat 4])
+                                            , OArray (Array.fromList [OFloat 5,OFloat 6])
+                                            ]
+                                        )
+                                    )
+                                |> addConstant "array_test2d_1"
+                                    (OArray
+                                        (Array.fromList
+                                            [ OArray (Array.fromList [OFloat 1,OFloat 2])
+                                            , OArray (Array.fromList [OFloat 3,OFloat 4])
+                                            ]
+                                        )
+                                    )
+                                |> addConstant "array_test2d_2"
+                                    (OArray
+                                        (Array.fromList
+                                            [ OArray (Array.fromList [OFloat 5,OFloat 6])
+                                            , OArray (Array.fromList [OFloat 7,OFloat 8])
+                                            ]
+                                        )
+                                    )
+                                |> addConstant "array_string_test"
+                                    (OArray
+                                        (Array.fromList
+                                            [ OString "a__"
+                                            , OString "b__"
+                                            , OString "c__"
+                                            , OString "d__"
+                                            , OString "e__"
+                                            , OString "f__"
+                                            ]
+                                        )
+                                    )
+                                |> addConstant "array_dict_test"
+                                    (OArray
+                                        (Array.fromList
+                                            [ODict  (Dict.fromList
+                                                        [ ("a", OFloat 1)
+                                                        , ("b", OFloat 2)
+                                                        , ("c", OFloat 3)
+                                                        ]
+                                                    )
+                                            ,ODict  (Dict.fromList
+                                                        [ ("a", OFloat 4)
+                                                        , ("b", OFloat 5)
+                                                        , ("c", OFloat 6)
+                                                        ]
+                                                    )
+                                            ]
+                                        )
+                                    )
+                                |> addConstant "array_dict_test2"
+                                    (OArray
+                                        (Array.fromList
+                                            [ODict  (Dict.fromList
+                                                        [ ("a", OFloat 1)
+                                                        , ("b", OFloat 2)
+                                                        , ("c", OFloat 3)
+                                                        ]
+                                                    )
+                                            ,ODict  (Dict.fromList
+                                                        [ ("a", OFloat 4)
+                                                        , ("b", OFloat 5)
+                                                        , ("c", OFloat 6)
+                                                        ]
+                                                    )
+                                            ,ODict  (Dict.fromList
+                                                        [ ("a", OFloat 7)
+                                                        , ("b", OFloat 8)
+                                                        , ("c", OFloat 9)
+                                                        ]
+                                                    )
+                                            ]
+                                        )
+                                    )
+                                |> addConstant "index" (OFloat 1)
+                                |> addConstant "dict_index" (OString "c")
+                                |> addConstant "dict_index2" (OString "xy")
+                                |> addConstant "dict_test"
+                                    (ODict
+                                        (Dict.fromList
+                                            [ ( "a", OFloat 1 )
+                                            , ( "b", OFloat 2 )
+                                            , ( "c", OFloat 3 )
+                                            , ( "d", OFloat 4 )
+                                            , ( "e", OFloat 5 )
+                                            ]
+                                        )
+                                    )
+                                |> addConstant "dict_test2"
+                                    (ODict
+                                        (Dict.fromList
+                                            [ ( "ab", OArray
+                                                       (Array.fromList
+                                                                 [ OFloat 1
+                                                                 , OFloat 2
+                                                                 , OFloat 3
+                                                                 ]
+                                                        )
+                                              )
+                                            , ( "xy", OArray
+                                                       (Array.fromList
+                                                                 [ OFloat 4
+                                                                 , OFloat 5
+                                                                 , OFloat 6
+                                                                 ]
+                                                        )
+                                              )
+                                            ]
+                                        )
+                                    )
+                                |> addFunction "strjoin" test_strjoin
+
+                        userenv =
+                            { userFunctions = Dict.empty
+                            , userEnv = Dict.empty
+                            }
+
+                        userfunc : userenv -> Context -> String -> Array.Array ArgValue -> OutVal
+                        userfunc userenv_ context_ funcname input_args =
+                            OString "OK"
+
+                        ans =
+                            evaluate userenv userfunc context expr
+                    in
+                    --Debug.toString ans
+                    ans
+    in
+    result
+
+test_check expr result =
+     let
+      r_ = test_exprexec expr
+      --r_ = test_exprexec2 expr test_const
+     in
+      case r_ of
+            ExprOk value ->
+                     if result == value then
+                        "OK"
+                     else
+                        "ExprOK ERR " ++ (Debug.toString value)
+            ExprErr err ->
+                     if result == (OString err) then
+                        "Er"
+                     else
+                        "ExprErr ERR " ++ (Debug.toString err)
+
+            ExprNotFoundFunc notfound ->
+                        "ExprNotFoundFunc"
+                     
+testfunc entry_  =
+       let
+          expr    = Tuple.first entry_
+          result_ = Tuple.second entry_
+       in
+       test_check expr result_
+
+----------------------------------------------------------------
+test_exprexec2 : String -> List (String, OutVal) -> ExprResult String OutVal (String, (Array.Array ArgValue))
+test_exprexec2 str addList =
+    let
+        ast =
+            parse str
+
+        result =
+            case ast of
+                Err err ->
+                    ExprErr (errAnalysis str err )
+
+                Ok expr ->
+                    let
+                        reg entry_ context_ =
+                              let
+                                name    = Tuple.first entry_
+                                value   = Tuple.second entry_
+                              in
+                              addConstant name value context_
+
+                        context_empty = empty
+                                |> addFunction "strjoin" test_strjoin
+
+                        context = List.foldl reg context_empty addList
+                        userenv =
+                            { userFunctions = Dict.empty
+                            , userEnv = Dict.empty
+                            }
+
+                        userfunc : userenv -> Context -> String -> Array.Array ArgValue -> OutVal
+                        userfunc userenv_ context_ funcname input_args =
+                            OString "OK"
+
+                        ans =
+                            evaluate userenv userfunc context expr
+                    in
+                    --Debug.toString ans
+                    ans
+    in
+    result
+
+test_check2 expr result const =
+     let
+      r_ = test_exprexec2 expr const
+     in
+      case r_ of
+            ExprOk value ->
+                     if result == value then
+                        "OK"
+                     else
+                        "ExprOK ERR " ++ (Debug.toString value)
+            ExprErr err ->
+                     if result == (OString err) then
+                        "Er"
+                     else
+                        "ExprErr ERR " ++ (Debug.toString err)
+
+            ExprNotFoundFunc notfound ->
+                        "ExprNotFoundFunc"
+
+test  constlist testlist=
+      let
+          testfunc2 entry_  =
+                 let
+                    expr    = Tuple.first entry_
+                    result_ = Tuple.second entry_
+                 in
+                 test_check2 expr result_ constlist
+       in
+       List.map testfunc2 testlist   
+
+----------------------------------------
+{--
+test expr result_ arr =
+       Array.push (test_check expr result_) arr
+
+r1 = exprexec " 1 + 3 + (7 //2) "
+r2 = test_check " 1 + 3 + (7 //2) " (OFloat 7)
+
+rlt0 = Array.fromList [] 
+       |> Array.push (test_check " 1 + 3 + (7 //2) " (OFloat 7) ) 
+
+rlt2 = Array.fromList [] 
+       |> test " 1 + 3 + (7 // 2) " (OFloat 7)
+       |> test " 1 + 3 + (7 /  2) " (OFloat 7.5)
+       |> test " 1 + 3 + (7 %  2) " (OFloat 5)
+       |> test " \"abc\" + \"ABC\" " (OString "abcABC" )
+--}
+----------------------------------------
+
+--test_const = Array.fromList [ 
 test_const =  [ 
 
   ( "test1"           ,(OString "OKOK") )
@@ -220,11 +588,6 @@ test_const =  [
                                         )
                                     ))
  ]
-
-------------------------------------------------------------------------------------
-test_func = [
-       ("strjoin"  ,test_strjoin)
-   ]
 
 ------------------------------------------------------------------------------------
 test_list1 =  [ 
@@ -935,13 +1298,13 @@ test_list5 =  [  -- variable method
 -- e3 = List.map testfunc test_list3err
 
 
-r1 = test test_const test_func test_list1  
-r2 = test test_const test_func test_list2  
-r3 = test test_const test_func test_list3  
-r4 = test test_const test_func test_list4  
-r5 = test test_const test_func test_list5  
+r1 = test test_const test_list1  
+r2 = test test_const test_list2  
+r3 = test test_const test_list3  
+r4 = test test_const test_list4  
+r5 = test test_const test_list5  
 
-e1 = test test_const test_func test_list1err  
-e2 = test test_const test_func test_list2err  
-e3 = test test_const test_func test_list3err  
+e1 = test test_const test_list1err  
+e2 = test test_const test_list2err  
+e3 = test test_const test_list3err  
 
