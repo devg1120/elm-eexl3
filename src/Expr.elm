@@ -111,7 +111,7 @@ dicGetSerch list name =
             in
             if List.isEmpty new_list then
                 --Err ("dicGetSerch...not found:" ++ name)
-                Err ("NotFound:" ++ name)
+                Err ("NotFound1:" ++ name)
 
             else
                 dicGetSerch new_list name
@@ -362,7 +362,35 @@ getFunction : String -> Context -> Maybe (Context -> Input -> OutVal)
 getFunction name (Context { functions }) =
     Dict.get name functions
 
+-------------------------------------------------------- basic func
+func_type : Array.Array OutVal -> OutVal
+func_type args =
+      case (Array.get 0 args) of
+         Just (OString a) ->
+              OString "OString"
 
+         Just (OFloat a) ->
+              OString "OFloat"
+
+         Just (OBool a) ->
+              OString "OBool"
+
+         Just (OArray a) ->
+              OString "OArray"
+
+         Just (ODict a) ->
+              OString "ODict"
+
+         _ ->
+              OString "unknown"
+
+getBasicFunction : String ->  Maybe ( Array.Array OutVal -> OutVal)
+getBasicFunction name  =
+      case name of
+          "type" ->
+                  Just func_type 
+          _ ->
+                  Nothing
 
 --------------------------------------------------------- evalate
 
@@ -399,6 +427,25 @@ argsToAvArgs userenv userfunc context exprs =
     in
     Array.fromList args
 
+argsToOutVal : userenv -> (userenv -> Context -> String -> Array.Array ArgValue -> OutVal) -> Context -> List Expr -> Array.Array OutVal
+argsToOutVal userenv userfunc context exprs =
+    let
+        func3 expr =
+            let
+                value =
+                    evaluate userenv userfunc context expr
+            in
+            case value of
+                ExprOk  a ->
+                     a
+
+                _ ->
+                    OString  "err"
+
+        args =
+            List.map func3 exprs
+    in
+    Array.fromList args
 
 evaluate : userenv -> (userenv -> Context -> String -> Array.Array ArgValue -> OutVal) -> Context -> Expr -> ExprResult String OutVal ( String, Array.Array ArgValue )
 evaluate userenv userfunc context expr =
@@ -415,22 +462,53 @@ evaluate userenv userfunc context expr =
                 Err v ->
                     ExprErr v
 
+--        Function name args ->
+--            let
+--                func_ =
+--                    getFunction name context
+--
+--                args_ =
+--                    argsToAvArgs userenv userfunc context args
+--            in
+--            case func_ of
+--                Just f ->
+--                    ExprOk (f context args_)
+--
+--                _ ->
+--                    --ExprNotFoundFunc  ("**not_found function:" ++ name)
+--                    --ExprNotFoundFunc  (name,args)
+--                    ExprOk (userfunc userenv context name args_)
+
         Function name args ->
             let
-                func_ =
-                    getFunction name context
+                func__ =
+                    getBasicFunction name 
 
-                args_ =
-                    argsToAvArgs userenv userfunc context args
             in
-            case func_ of
+            case func__ of
                 Just f ->
-                    ExprOk (f context args_)
+                    --ExprOk (f context args)
+                    let
+                       args2 = 
+                           argsToOutVal userenv userfunc context args
+                    in
+                    ExprOk (f  args2)
 
                 _ ->
-                    --ExprNotFoundFunc  ("**not_found function:" ++ name)
-                    --ExprNotFoundFunc  (name,args)
-                    ExprOk (userfunc userenv context name args_)
+                    let
+                        func_ =
+                            getFunction name context
+
+                        args_ =
+                            argsToAvArgs userenv userfunc context args
+                    in
+                    case func_ of
+                        Just f2 ->
+                            ExprOk (f2 context args_)
+
+                        _ ->
+                            ExprOk (userfunc userenv context name args_)
+
 
         VariableMethod variable_name func_name args ->
             let
@@ -443,6 +521,17 @@ evaluate userenv userfunc context expr =
             case value of
                 Ok v ->
                     case func_name of
+                        "type" ->
+                            case v of
+                                OString s ->
+                                    ExprOk (OString "OString")
+
+                                OArray a ->
+                                    ExprOk (OString "OArray")
+
+                                _ ->
+                                    ExprErr "typeof() err"
+
                         "len" ->
                             case v of
                                 OString s ->
@@ -1889,6 +1978,21 @@ default =
 
 ---------------------------------------------
 
+array_empty : Parser Expr
+array_empty =
+    succeed Tuple.pair
+        |= backtrackable (symbol "[")
+        |. spaces
+        |= symbol "]"
+        |> andThen
+            (\( a, b ) ->
+                let
+                    base =
+                        Array.fromList []
+                in
+                succeed (Array base)
+            )
+
 array : Parser Expr
 array =
     succeed Tuple.pair
@@ -1913,7 +2017,9 @@ arrayValues =
             , backtrackable stringValue
             , backtrackable intValue
             , backtrackable floatValue
+            , backtrackable dict2_empty
             , backtrackable dict2
+            , backtrackable array2d_empty
             , backtrackable array2d
             --, backtrackable dict2
             , varValue
@@ -1939,7 +2045,9 @@ arrayValuesTail =
                 , backtrackable stringValue
                 , backtrackable intValue
                 , backtrackable floatValue
+                , backtrackable dict2_empty
                 , backtrackable dict2
+                , backtrackable array2d_empty
                 , backtrackable array2d
                 --, backtrackable dict2
                 , varValue
@@ -1950,6 +2058,21 @@ arrayValuesTail =
             |= lazy (\_ -> arrayValuesTail)
         , succeed []
         ]
+
+array2d_empty : Parser ArgValue
+array2d_empty =
+    succeed Tuple.pair
+        |= backtrackable (symbol "[")
+        |. spaces
+        |= symbol "]"
+        |> andThen
+            (\( a, b ) ->
+                let
+                    base =
+                        Array.fromList []
+                in
+                succeed (AvArray base)
+            )
 
 array2d : Parser ArgValue
 array2d =
@@ -2005,6 +2128,20 @@ array2dValuesTail =
         ]
 
 ----------------------------------------------
+array2_empty : Parser ArgValue
+array2_empty =
+    succeed Tuple.pair
+        |= backtrackable (symbol "[")
+        |= symbol "]"
+        |> andThen
+            (\( a, b ) ->
+                let
+                    base =
+                        Array.fromList []
+                in
+                succeed (AvArray base)
+            )
+
 array2 : Parser ArgValue
 array2 =
     succeed Tuple.pair
@@ -2029,6 +2166,7 @@ arrayValues2 =
             , backtrackable stringValue
             , backtrackable intValue
             , backtrackable floatValue
+            , backtrackable array2d_empty
             , backtrackable array2d
             , varValue
             ]
@@ -2051,6 +2189,7 @@ arrayValuesTail2 =
                 , backtrackable stringValue
                 , backtrackable intValue
                 , backtrackable floatValue
+                , backtrackable array2d_empty
                 , backtrackable array2d
                 , varValue
                 ]
@@ -2062,6 +2201,21 @@ arrayValuesTail2 =
 
 
 ---------------------------------------------
+
+dict_empty : Parser Expr
+dict_empty =
+    succeed Tuple.pair
+        |= backtrackable (symbol "{")
+        |. spaces
+        |= symbol "}"
+        |> andThen
+            (\( a, b ) ->
+                let
+                    base =
+                        Dict.fromList []
+                in
+                succeed (Dict base)
+            )
 
 dict : Parser Expr
 dict =
@@ -2107,6 +2261,8 @@ dictKV =
             , backtrackable intValue
             , backtrackable floatValue
             , backtrackable arrayValue
+            , backtrackable dict2_empty
+            , backtrackable dict2
             , varValue
             ]
 
@@ -2137,6 +2293,21 @@ dictValuesTail =
         ]
 
 ---------------------------------------------
+
+dict2_empty : Parser ArgValue
+dict2_empty =
+    succeed Tuple.pair
+        |= backtrackable (symbol "{")
+        |. spaces
+        |= symbol "}"
+        |> andThen
+            (\( a, b ) ->
+                let
+                    base =
+                        Dict.fromList []
+                in
+                succeed (AvDict base)
+            )
 
 dict2 : Parser ArgValue
 dict2 =
@@ -2299,7 +2470,11 @@ arrayValue : Parser ArgValue
 arrayValue =
     succeed Just
         |. spaces
-        |= array2
+        --|= array2
+        |= oneOf
+           [ backtrackable array2_empty
+           , array2
+           ]
         |. spaces
         |> andThen
             (\arg ->
@@ -2736,7 +2911,9 @@ term =
         |= oneOf
             --[ digits
             [ backtrackable string
+            , backtrackable array_empty
             , backtrackable array
+            , backtrackable dict_empty
             , backtrackable dict
             , backtrackable func
             , backtrackable array_slice
@@ -2794,7 +2971,9 @@ term2 =
         |= oneOf
             --[ digits
             [ backtrackable string
+            , backtrackable array_empty
             , backtrackable array
+            , backtrackable dict_empty
             , backtrackable dict
 
             --, backtrackable func

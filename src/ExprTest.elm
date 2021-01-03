@@ -10,6 +10,19 @@ import ExprTestApi exposing (..)
 ---------------------------------------------------------------------
 
 
+typeof : Context -> Input -> OutVal
+typeof context ar =
+            case Array.get 0 ar of
+                Just (AvString a) ->
+                    OString "AvString"
+
+                Just (AvVar a) ->
+                    OString "AvVar"
+
+                _ ->
+                    OString "don't know"
+
+
 test_strjoin : Context -> Input -> OutVal
 test_strjoin context ar =
     let
@@ -79,8 +92,14 @@ test_strjoin context ar =
             a_ ++ b_
     in
     OString ans
--------------------------------------------------------------------------
 
+------------------------------------------------------------------------------------
+test_func = [
+       ("strjoin"  ,test_strjoin )
+      ,("typeof"   ,typeof       )
+   ]
+
+------------------------------------------------------------------------------------
 test_const =  [ 
 
   ( "test1"           ,(OString "OKOK") )
@@ -222,11 +241,7 @@ test_const =  [
  ]
 
 ------------------------------------------------------------------------------------
-test_func = [
-       ("strjoin"  ,test_strjoin)
-   ]
 
-------------------------------------------------------------------------------------
 test_list1 =  [ 
 
     ( " 1 + 3 + (7 // 2)   "  ,  OFloat 7            )
@@ -320,7 +335,7 @@ test_list1 =  [
    ,( " 1   != 100           "  ,  OBool True        )
    ,( " 1   == 1             "  ,  OBool True        )
 
-   ,( " e                    "  ,  OString "NotFound:e" )
+   ,( " e                    "  ,  OString "NotFound1:e" )
    --,(  ,    )
 
    ]
@@ -397,6 +412,9 @@ test_list2 =  [  -- array
     ( " [ 1,2,3,4,5] " ,
         OArray (Array.fromList [OFloat 1,OFloat 2,OFloat 3,OFloat 4,OFloat 5])  )
 
+   ,( " [] " ,
+        OArray (Array.fromList [])  )
+
    ,( " [ test1,2,3,4,5] " ,
         OArray (Array.fromList [OString "OKOK" ,OFloat 2,OFloat 3,OFloat 4,OFloat 5])  )
 
@@ -440,6 +458,11 @@ test_list2 =  [  -- array
    ,( " [ [1,2],[3,4],[5,6]] " ,
         OArray (Array.fromList [OArray (Array.fromList [OFloat 1,OFloat 2]),
                                 OArray (Array.fromList [OFloat 3,OFloat 4]),
+                                OArray (Array.fromList [OFloat 5,OFloat 6])])    )
+
+   ,( " [ [1,2],[],[5,6]] " ,
+        OArray (Array.fromList [OArray (Array.fromList [OFloat 1,OFloat 2]),
+                                OArray (Array.fromList []),
                                 OArray (Array.fromList [OFloat 5,OFloat 6])])    )
 
    ,( " [ [test1,2],[3,4],[5,6]] " ,
@@ -521,6 +544,12 @@ test_list2 =  [  -- array
              ,ODict (Dict.fromList [("a",OFloat 7),("b",OFloat 8),("c",OFloat 9)])
              ]) )
 
+   ,( " [{}, {\"a\" : 4, \"b\" : 5, \"c\" :6 },{\"a\" : 7, \"b\" : 8, \"c\" :9 }] ", 
+        OArray (Array.fromList 
+             [ODict (Dict.fromList [])
+             ,ODict (Dict.fromList [("a",OFloat 4),("b",OFloat 5),("c",OFloat 6)])
+             ,ODict (Dict.fromList [("a",OFloat 7),("b",OFloat 8),("c",OFloat 9)])
+             ]) )
    ]
 
 test_list2err =  [  -- array 
@@ -767,6 +796,9 @@ test_list4 =  [  -- dict
     ( " {\"ab\" : 1, \"xy\" : 2}   ", 
         ODict (Dict.fromList [("ab",OFloat 1),("xy",OFloat 2)])   )
 
+   ,( " {}   ", 
+        ODict (Dict.fromList [])   )
+
    ,( " {\"ab\" : \"1\", \"xy\" : \"2\"}   ", 
         ODict (Dict.fromList [("ab",OString "1"),("xy",OString "2")])   )
 
@@ -777,6 +809,11 @@ test_list4 =  [  -- dict
 
    ,( " {\"ab\" : [test1,2,3], \"xy\" : [4,5,6+2]}   ", 
         ODict (Dict.fromList [("ab",OArray (Array.fromList [OString "OKOK",OFloat 2,OFloat 3])),
+                              ("xy",OArray (Array.fromList [OFloat 4,OFloat 5,OFloat 8]))
+                             ])   )
+
+   ,( " {\"ab\" : [], \"xy\" : [4,5,6+2]}   ", 
+        ODict (Dict.fromList [("ab",OArray (Array.fromList [])),
                               ("xy",OArray (Array.fromList [OFloat 4,OFloat 5,OFloat 8]))
                              ])   )
 
@@ -792,6 +829,19 @@ test_list4 =  [  -- dict
 
    ,( " {\"ab\" : [[1,2],[3,4]], \"xy\" : [[5,6],[7,8]]}   ", 
         ODict (Dict.fromList [("ab",OArray (Array.fromList [OArray (Array.fromList [OFloat 1,OFloat 2])
+                                                           ,OArray (Array.fromList [OFloat 3,OFloat 4])
+                                                           ]
+                                              )
+                              )
+                             ,("xy",OArray (Array.fromList [OArray (Array.fromList [OFloat 5,OFloat 6])
+                                                           ,OArray (Array.fromList [OFloat 7,OFloat 8])
+                                                           ]
+                                              )  
+                              )
+                              ]) )
+
+   ,( " {\"ab\" : [[],[3,4]], \"xy\" : [[5,6],[7,8]]}   ", 
+        ODict (Dict.fromList [("ab",OArray (Array.fromList [OArray (Array.fromList [])
                                                            ,OArray (Array.fromList [OFloat 3,OFloat 4])
                                                            ]
                                               )
@@ -838,6 +888,16 @@ test_list4 =  [  -- dict
    ,( " {\"ab\" : [1,\"2\",3], \"xy\" : [4,\"5\",6]}   ", 
         ODict (Dict.fromList [("ab",OArray (Array.fromList [OFloat 1,OString "2",OFloat 3])),
                               ("xy",OArray (Array.fromList [OFloat 4,OString "5",OFloat 6]))
+                             ])   )
+
+   ,( " {\"ab\" : { \"a\" : 1, \"b\" : 2}, \"xy\" : { \"a\" : 3, \"b\" : 4}}   ", 
+        ODict (Dict.fromList [("ab",ODict (Dict.fromList [("a",OFloat 1),("b",OFloat 2)]))
+                             ,("xy",ODict (Dict.fromList [("a",OFloat 3),("b",OFloat 4)]))
+                             ])   )
+
+   ,( " {\"ab\" : { \"a\" : 1, \"b\" : 2}, \"xy\" : {  }}   ", 
+        ODict (Dict.fromList [("ab",ODict (Dict.fromList [("a",OFloat 1),("b",OFloat 2)]))
+                             ,("xy",ODict (Dict.fromList []))
                              ])   )
 
    ,( " dict_test.c   ", 
@@ -923,16 +983,32 @@ test_list5 =  [  -- variable method
         OArray (Array.fromList [OString "tom",OString "99",OString "90",OString "85"])   )
    ]
 
+test_list6 =  [  -- typeof
+
+  ( "  typeof(abc)         ",  OString "AvString" )
+
+ ,( "  abc.type()          ",  OString "OString" )
+
+ ,( "  abc.len()           ",  OFloat 6 )
+
+ ,( "  array_test.len()    ",  OFloat 5 )
+
+ ,( "  type(\"AB\")        ",  OString "OString" )
+
+ ,( "  type(abc)           ",  OString "OString" )
+
+ ,( "  type(array_test)    ",  OString "OArray" )
+
+ ,( "  type(1)             ",  OString "OFloat" )
+ ,( "  type(True)          ",  OString "OBool" )
+ ,( "  type([1,2,3])       ",  OString "OArray" )
+ ,( "  type({\"a\" : 1})   ",  OString "ODict" )
+ ,( "  type([])            ",  OString "OArray" )
+ ,( "  type({})            ",  OString "ODict" )
+
+ ]
+
 -----------------------------------------------------
--- r1 = List.map testfunc test_list1
--- r2 = List.map testfunc test_list2
--- r3 = List.map testfunc test_list3
--- r4 = List.map testfunc test_list4
--- r5 = List.map testfunc test_list5
--- 
--- e1 = List.map testfunc test_list1err
--- e2 = List.map testfunc test_list2err
--- e3 = List.map testfunc test_list3err
 
 
 r1 = test test_const test_func test_list1  
@@ -940,6 +1016,7 @@ r2 = test test_const test_func test_list2
 r3 = test test_const test_func test_list3  
 r4 = test test_const test_func test_list4  
 r5 = test test_const test_func test_list5  
+r6 = test test_const test_func test_list6  
 
 e1 = test test_const test_func test_list1err  
 e2 = test test_const test_func test_list2err  
