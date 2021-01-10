@@ -86,9 +86,10 @@ errAnalysis source err =
 
 ----------------------------------------------------------------
 test_exprexec : String -> List (String, OutVal) 
+                        -> List (String, List String) 
                         -> List (String, Context -> Input -> OutVal)
                         -> ExprResult String OutVal (String, (Array.Array ArgValue))
-test_exprexec source add_const add_func =
+test_exprexec source add_const add_enum add_func =
     let
         ast =
             parse source
@@ -107,6 +108,13 @@ test_exprexec source add_const add_func =
                               in
                               addConstant name value context_
 
+                        reg_enum  entry_ context_ =
+                              let
+                                name    = Tuple.first entry_
+                                value   = Tuple.second entry_
+                              in
+                              addEnumDict name value context_
+
                         reg_func entry_ context_ =
                               let
                                 name    = Tuple.first entry_
@@ -116,8 +124,9 @@ test_exprexec source add_const add_func =
 
 
                         context_empty = empty
-                        context_const = List.foldl reg_const context_empty add_const
-                        context       = List.foldl reg_func  context_const add_func
+                        context1 = List.foldl reg_const context_empty add_const
+                        context2 = List.foldl reg_enum  context1      add_enum
+                        context  = List.foldl reg_func  context2      add_func
 
                         userenv =
                             { userFunctions = Dict.empty
@@ -136,9 +145,54 @@ test_exprexec source add_const add_func =
     in
     result
 
-test_check expr result constlist funclist =
+test_contextdump :  List (String, OutVal) 
+                     -> List (String, List String) 
+                     -> List (String, Context -> Input -> OutVal)
+                     -> Context
+test_contextdump add_const add_enum add_func =
+    let
+                        reg_const entry_ context_ =
+                              let
+                                name    = Tuple.first entry_
+                                value   = Tuple.second entry_
+                              in
+                              addConstant name value context_
+
+                        reg_enum  entry_ context_ =
+                              let
+                                name    = Tuple.first entry_
+                                value   = Tuple.second entry_
+                              in
+                              addEnumDict name value context_
+
+                        reg_func entry_ context_ =
+                              let
+                                name    = Tuple.first entry_
+                                value   = Tuple.second entry_
+                              in
+                              addFunction name value context_
+
+
+                        context_empty = empty
+                        context1 = List.foldl reg_const context_empty add_const
+                        context2 = List.foldl reg_enum  context1      add_enum
+                        context  = List.foldl reg_func  context2      add_func
+
+                        userenv =
+                            { userFunctions = Dict.empty
+                            , userEnv = Dict.empty
+                            }
+
+                        userfunc : userenv -> Context -> String -> Array.Array ArgValue -> OutVal
+                        userfunc userenv_ context_ funcname input_args =
+                            OString "OK"
+
+    in
+    context
+
+test_check expr result constlist enumlist funclist =
      let
-      r_ = test_exprexec expr constlist funclist
+      r_ = test_exprexec expr constlist enumlist funclist
      in
       case r_ of
             ExprOk value ->
@@ -155,14 +209,14 @@ test_check expr result constlist funclist =
             ExprNotFoundFunc notfound ->
                         "ExprNotFoundFunc"
 
-test  constlist funclist testlist =
+test  constlist enumlist funclist testlist =
       let
           testfunc entry_  =
                  let
                     expr    = Tuple.first entry_
                     result_ = Tuple.second entry_
                  in
-                 test_check expr result_ constlist funclist
+                 test_check expr result_ constlist enumlist funclist
        in
        List.map testfunc testlist   
 

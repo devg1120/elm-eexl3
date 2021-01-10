@@ -100,6 +100,18 @@ test_func = [
    ]
 
 ------------------------------------------------------------------------------------
+test_enum =  [ 
+      ("Sushi"
+         ,["Tako","Ika","Tai","Tamago","Maguro"]
+      )
+     ,("Car"
+         ,["Honda","Toyota","Suzuki","Nissan","Matsuda"]
+      )
+     ,("City"
+         ,["Tokyo","Osaka","Kobe","Fukuoka","Nara"]
+      )
+   ]
+
 test_const =  [ 
 
   ( "test1"           ,(OString "OKOK") )
@@ -334,6 +346,10 @@ test_list1 =  [
    ,( " 1   == 100           "  ,  OBool False       )
    ,( " 1   != 100           "  ,  OBool True        )
    ,( " 1   == 1             "  ,  OBool True        )
+
+   ,( " City::Kobe           "  ,  OEnum (3,3)       )
+   ,( " Sushi::Tai           "  ,  OEnum (1,3)       )
+   ,( " Car::Matsuda         "  ,  OEnum (2,5)       )
 
    ,( " e                    "  ,  OString "NotFound1:e" )
    --,(  ,    )
@@ -1011,14 +1027,16 @@ test_list6 =  [  -- typeof
 -----------------------------------------------------
 
 
-r1 = test test_const test_func test_list1  
-r2 = test test_const test_func test_list2  
-r3 = test test_const test_func test_list3  
-r4 = test test_const test_func test_list4  
-r5 = test test_const test_func test_list5  
-r6 = test test_const test_func test_list6  
+r1 = test test_const test_enum test_func test_list1  
+r2 = test test_const test_enum test_func test_list2  
+r3 = test test_const test_enum test_func test_list3  
+r4 = test test_const test_enum test_func test_list4  
+r5 = test test_const test_enum test_func test_list5  
+r6 = test test_const test_enum test_func test_list6  
 
-e1 = test test_const test_func test_list1err  
-e2 = test test_const test_func test_list2err  
-e3 = test test_const test_func test_list3err  
+e1 = test test_const test_enum test_func test_list1err  
+e2 = test test_const test_enum test_func test_list2err  
+e3 = test test_const test_enum test_func test_list3err  
+
+c1 = test_contextdump  test_const test_enum test_func   
 

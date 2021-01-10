@@ -9,6 +9,9 @@ module Expr exposing
     , Input
     , OutVal(..)
     , addConstant
+    , addEnumDict
+    , getEnumKey
+    , getEnumString
     , addFunction
     , dicPop
     , dicPush
@@ -44,6 +47,7 @@ type Expr
     | Floating Float
     | String String
     | Default Int
+    | Enum String String
     | Array (Array.Array ArgValue)
     | Dict (Dict String ArgValue)
     | Bool Bool
@@ -85,7 +89,7 @@ type OutVal
     | OArray (Array.Array OutVal)
       --| ODict  (Dict OutVal OutVal)
     | ODict (Dict String OutVal)
-    | OEnum Int Int
+    | OEnum (Int,Int)
 
 
 
@@ -233,6 +237,7 @@ type Context
     = Context
         { constants : Stack.Stack (Dict.Dict String OutVal)
         , functions : Dict String (Context -> Input -> OutVal)
+        , enumdic   : Dict.Dict String (Dict.Dict String ( Int, Int ))
         , functop : Bool
         , return : Bool
         , break : Bool
@@ -248,6 +253,7 @@ empty =
     Context
         { constants = dicInit
         , functions = Dict.empty
+        , enumdic   = Dict.empty
         , functop = False
         , return = False
         , break = False
@@ -256,6 +262,105 @@ empty =
         , scope = True
         , defvar = True
         }
+
+
+addEnumDict : String -> List String -> Context -> Context
+addEnumDict name entry (Context context) =
+    let
+      dic = context.enumdic
+      l = List.length entry
+      (new_dic,num) = 
+         case (Dict.get "_" dic) of
+                   Just a ->
+                            let
+                              n_ = Dict.size a
+                              n = n_ + 1
+                            in
+                            (Dict.insert "_" (Dict.insert name (n,l) a ) dic ,n)
+                   Nothing ->
+                            let
+                             d = Dict.empty
+                            in
+                            (Dict.insert "_" (Dict.insert name (1,l) d)  dic ,1)
+
+      entry_dic_empty = Dict.empty
+      f name_ (dic_, n) =
+            let
+               n2 = n + 1
+            in
+            (Dict.insert name_ (num,n2) dic_, n2)
+            
+      (entry_dic, len)  = List.foldl f (entry_dic_empty, 0) entry
+
+      new_dic_all = Dict.insert name entry_dic new_dic
+
+    in
+    Context
+        { context
+            | enumdic = new_dic_all
+        }
+
+
+getEnumKey : String -> Context -> Maybe ( Int, Int )
+getEnumKey name_entry  (Context context) =
+    let
+      dic = context.enumdic
+      args = Array.fromList (String.split "::" name_entry)
+      name  = Array.get 0 args
+      entry  = Array.get 1 args
+    in
+    case (name,entry) of
+      (Just name_,Just entry_) ->
+          case (Dict.get name_ dic) of
+               Just a ->
+                        Dict.get  entry_ a  
+               Nothing ->
+                        Just (0,0)
+      _ ->
+          Just (0,0)
+
+
+enumdic_convert  : Dict.Dict String (Dict.Dict String b) -> List ( b, String )
+
+enumdic_convert dic =
+     let
+        filter k v = 
+             if k == "_" then
+                 False
+             else
+                 True
+
+        dic_list = Dict.toList (Dict.filter filter dic)
+        fp e li =
+          let
+            name = Tuple.first e
+            edic = Tuple.second e
+            edic_list = Dict.toList edic
+            fe e2 li2 =
+               let
+                 name2 = Tuple.first e2
+                 edic2 = Tuple.second e2
+                 ele = (edic2,name ++ "::" ++ name2) 
+               in
+               (::) ele  li2
+           in
+           List.foldl fe li edic_list 
+
+     in
+     List.foldl fp [] dic_list 
+
+--getEnumString : comparable -> Context -> Maybe String
+getEnumString : (Int, Int) -> Context -> Maybe String
+getEnumString key  (Context context) =
+    let
+      dic = context.enumdic
+      dic_list = enumdic_convert dic
+      dict_ = Dict.fromList dic_list
+    in
+    Dict.get key dict_
+
+
+
 
 
 addConstant : String -> OutVal -> Context -> Context
@@ -1216,6 +1321,17 @@ evaluate userenv userfunc context expr =
 
         Bool n ->
             ExprOk (OBool n)
+
+        Enum a b  ->
+            let
+              name = a ++ "::" ++ b
+              key = getEnumKey name context
+            in
+            case key of
+               Just aa ->
+                   ExprOk (OEnum aa)
+               _ ->
+                   ExprErr ("enum not entry:"++ name)
 
         Array an ->
             let
@@ -2848,6 +2964,26 @@ variable_method2 =
         |. symbol ")"
 
 
+enum : Parser Expr
+enum =
+    succeed Tuple.pair
+        |= variable
+            { start = Char.isUpper
+            , inner = \c -> Char.isAlphaNum c || c == '_'
+            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "var", "def", "return", "break", "continue" ]
+            }
+        |. symbol ":"
+        |. symbol ":"
+        |= variable
+            { start = Char.isUpper
+            , inner = \c -> Char.isAlphaNum c || c == '_'
+            , reserved = Set.fromList [ "if", "then", "else", "elsif", "while", "do", "end", "for", "case", "var", "def", "return", "break", "continue" ]
+            }
+        |> andThen
+            (\( name, entry ) ->
+                --succeed (DictIndex name entry)
+                succeed (Enum name entry)
+            )
 
 -- PARSER
 
@@ -2912,6 +3048,7 @@ term =
         |= oneOf
             --[ digits
             [ backtrackable string
+            , backtrackable enum
             , backtrackable array_empty
             , backtrackable array
             , backtrackable dict_empty
@@ -2972,6 +3109,7 @@ term2 =
         |= oneOf
             --[ digits
             [ backtrackable string
+            , backtrackable enum
             , backtrackable array_empty
             , backtrackable array
             , backtrackable dict_empty
@@ -3026,6 +3164,7 @@ term3 =
         |= oneOf
             --[ digits
             [ backtrackable string
+            , backtrackable enum
             , backtrackable array
             , backtrackable dict
 
@@ -3078,6 +3217,7 @@ term4 =
         |= oneOf
             --[ digits
             [ backtrackable string
+            , backtrackable enum
             , backtrackable array
             , backtrackable dict
 
@@ -3129,6 +3269,7 @@ term5 =
         |= oneOf
             --[ digits
             [ backtrackable string
+            , backtrackable enum
             --, backtrackable array
             --, backtrackable dict
 

@@ -131,9 +131,9 @@ enum_get2 name entry dic  =
          Nothing ->
                   Just (0,0)
 
-enum_get name_entry dic  =
+enumNameToKey name_entry dic  =
     let
-      args = Array.fromList (String.split ":" name_entry)
+      args = Array.fromList (String.split "::" name_entry)
       name  = Array.get 0 args
       entry  = Array.get 1 args
     in
@@ -146,6 +146,67 @@ enum_get name_entry dic  =
                         Just (0,0)
       _ ->
           Just (0,0)
+
+
+enumKeyToName key dic =
+      let
+         dic_list = dic_convert dic
+         dict = Dict.fromList dic_list
+      in
+      Dict.get key dict
+
+dic_convert dic =
+     let
+        filter k v = 
+             if k == "_" then
+                 False
+             else
+                 True
+
+        dic_list = Dict.toList (Dict.filter filter dic)
+        fp e li =
+          let
+            name = Tuple.first e
+            edic = Tuple.second e
+            edic_list = Dict.toList edic
+            fe e2 li2 =
+               let
+                 name2 = Tuple.first e2
+                 edic2 = Tuple.second e2
+                 ele = (edic2,name ++ "::" ++ name2) 
+               in
+               (::) ele  li2
+           in
+           List.foldl fe li edic_list 
+
+     in
+     List.foldl fp [] dic_list 
+           
+dic_convert_ dic =
+     let
+        filter k v = 
+             if k == "_" then
+                 False
+             else
+                 True
+
+        --dic_list = Dict.toList dic
+        dic_list = Dict.toList (Dict.filter filter dic)
+        fp e =
+          let
+            name = Tuple.first e
+            edic = Tuple.second e
+            edic_list = Dict.toList edic
+            fe e2 =
+               let
+                 name2 = Tuple.first e2
+                 edic2 = Tuple.second e2
+               in
+               (edic2,name ++ "::" ++ name2)
+           in
+           List.map fe edic_list
+     in
+     List.map fp dic_list
 
 --enum_count2  dic =
 --    case (Dict.get "_" dic) of
@@ -174,7 +235,7 @@ enumdic = enum_reg enum_name1 enum_entry1 Dict.empty
        |> enum_reg enum_name3 enum_entry3
 
 s2 = enum_get2 "City" "Kobe" enumdic
-s3 = enum_get "City:Kobe" enumdic
+s3 = enumNameToKey "City::Kobe" enumdic
 
 
 enumdic2 = enum_reg_list enum_name1 enum_entry1_list Dict.empty
@@ -182,4 +243,10 @@ enumdic2 = enum_reg_list enum_name1 enum_entry1_list Dict.empty
         |> enum_reg_list enum_name3 enum_entry3_list
 
 s4 = enum_get2 "City" "Kobe" enumdic2
-s5 = enum_get "City:Kobe" enumdic2
+s5 = enumNameToKey "City::Kobe" enumdic2
+d1 = dic_convert enumdic2
+d2 = dic_convert_ enumdic2
+
+
+l1 = enumKeyToName (3,3) enumdic2
+l2 = enumKeyToName (1,4) enumdic2
