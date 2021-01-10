@@ -124,6 +124,7 @@ test_const =  [
  ,( "findstr3"        ,(OString "(\\d\\d\\d)"))
  ,( "test_float"      ,(OFloat 10.1))
  ,( "test_bool"       ,(OBool  False))
+ ,( "test_enum"       ,(OEnum (3,3)))
  ,( "array_test"      ,
                                     (OArray
                                         (Array.fromList
@@ -350,6 +351,12 @@ test_list1 =  [
    ,( " City::Kobe           "  ,  OEnum (3,3)       )
    ,( " Sushi::Tai           "  ,  OEnum (1,3)       )
    ,( " Car::Matsuda         "  ,  OEnum (2,5)       )
+--   ,( " Car::Mary            "  ,  OEnum (2,5)       )
+   ,( " City::Kobe == City::Kobe   "  ,  OBool True  )
+   ,( " City::Kobe != City::Kobe   "  ,  OBool False )
+   ,( " City::Kobe != City::Nara   "  ,  OBool True  )
+   ,( " City::Kobe == test_enum    "  ,  OBool True  )
+   ,( " test_enum  == City::Nara   "  ,  OBool False )
 
    ,( " e                    "  ,  OString "NotFound1:e" )
    --,(  ,    )
@@ -368,7 +375,7 @@ test_list1err =  [
    ,( "  -4+ 3 5                "  ,  OFloat -1                           )
    ,( "  -4 !! 5                "  ,  OFloat -4                           )
    ,( "  -4 ++ 5                "  ,  OString "UnExpect 1:7 -> +"         )
-   ,( " false                   "  ,  OString "NotFound:false"            )
+   ,( " false                   "  ,  OString "NotFound1:false"            )
    ,( " True /  True            "  ,  OString "div value must Float"      )
    ,( " True //  True           "  ,  OString "div2 value must Float"     )
    ,( " True %  True            "  ,  OString "div3 value must Float"     )
@@ -417,6 +424,7 @@ test_list1err =  [
 
    ,( "   -1                    "  ,  OFloat -1        )
    ,( "   -index                "  ,  OString "UnExpect 1:4 -> -"         )
+   ,( " Car::Mary            "  ,  OString "enum not entry:Car::Maty"       )
 
    --,(  ,    )
    ]

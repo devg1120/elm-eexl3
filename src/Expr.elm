@@ -1955,6 +1955,9 @@ evaluate userenv userfunc context expr =
                 ( ExprOk (OBool a1), ExprOk (OBool b1) ) ->
                     ExprOk (OBool (a1 == b1))
 
+                ( ExprOk (OEnum a1), ExprOk (OEnum b1) ) ->
+                    ExprOk (OBool (a1 == b1))
+
                 _ ->
                     ExprErr "== UnMatch Type Float/String/Bool"
 
@@ -1974,6 +1977,9 @@ evaluate userenv userfunc context expr =
                     ExprOk (OBool (a1 /= b1))
 
                 ( ExprOk (OBool a1), ExprOk (OBool b1) ) ->
+                    ExprOk (OBool (a1 /= b1))
+
+                ( ExprOk (OEnum a1), ExprOk (OEnum b1) ) ->
                     ExprOk (OBool (a1 /= b1))
 
                 _ ->
