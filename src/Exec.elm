@@ -47,6 +47,7 @@ type Statement
     | While Expr (List Statement)
     | For Expr Expr (List Statement)
     | DefVar Expr Expr
+    | DefEnum String (List String)
     | DefFunc Expr (List Expr) (List Statement)
     | Assign Expr Expr
     | Return Expr
@@ -169,6 +170,7 @@ statement : Parser Statement
 statement =
     oneOf
         [ defVarStatement
+        , defEnumStatement
         , defFuncStatement
         , assignStatement
         , backtrackable ifStatement -- if then else
@@ -438,6 +440,70 @@ caseBlocksTail =
         ]
 
 
+-------------------------------------------------------
+
+defEnumStatement : Parser Statement
+defEnumStatement =
+    succeed DefEnum
+        |. spaces
+        |. keyword "enum"
+        |. spaces
+        --|= lazy (\_ -> expression)
+        |= variable
+            { start = Char.isUpper
+            , inner = \c -> Char.isAlphaNum c || c == '_'
+            , reserved = Set.fromList [ "if", "then", "else", "elsif", "end", "while", "do", "in", "for", "case", "default", "let", "fn", "return", "break", "continue" ]
+            }
+        |. spaces
+        |. keyword "{"
+        |. spaces
+        |= lazy (\_ -> defEnumBlocks)
+        |. spaces
+        |. keyword "}"
+        |. spaces
+        |. symbol ";"
+
+
+defEnumBlock : Parser String
+defEnumBlock =
+    succeed  identity
+        |. spaces
+        |= variable
+            { start = Char.isUpper
+            , inner = \c -> Char.isAlphaNum c || c == '_'
+            , reserved = Set.fromList [ "if", "then", "else", "elsif", "end", "while", "do", "in", "for", "case", "default", "let", "fn", "return", "break", "continue" ]
+            }
+        |. spaces
+        |. symbol ","
+        |. spaces
+
+
+defEnumBlocks : Parser (List String)
+defEnumBlocks =
+    succeed (::)
+        |. spaces
+        |= lazy (\_ -> defEnumBlock)
+        |. spaces
+        |= defEnumBlocksTail
+        |> andThen
+            (\b ->
+                succeed b
+            )
+
+
+defEnumBlocksTail : Parser (List String)
+defEnumBlocksTail =
+    oneOf
+        [ succeed (::)
+            |. spaces
+            |= lazy (\_ -> defEnumBlock)
+            |. spaces
+            |= lazy (\_ -> defEnumBlocksTail)
+        , succeed []
+        ]
+
+
+-------------------------------------------------------
 defFuncStatement : Parser Statement
 defFuncStatement =
     succeed DefFunc
@@ -765,6 +831,9 @@ evalElsIfs exprStmts elseStmts userenv context =
                 ODict _ ->
                     "false"
 
+                OEnum _ ->
+                    "false"
+
         userenv_context_2 =
             case a_ of
                 OBool True ->
@@ -793,6 +862,9 @@ evalElsIfs exprStmts elseStmts userenv context =
                     ( userenv, context )
 
                 ODict _ ->
+                    ( userenv, context )
+
+                OEnum _ ->
                     ( userenv, context )
     in
     userenv_context_2
@@ -834,6 +906,9 @@ evalElsIfs2 exprStmts userenv context =
                 ODict _ ->
                     "false"
 
+                OEnum _ ->
+                    "false"
+
         userenv_context_2 =
             case a_ of
                 OBool True ->
@@ -862,6 +937,9 @@ evalElsIfs2 exprStmts userenv context =
                     ( userenv, context )
 
                 ODict _ ->
+                    ( userenv, context )
+
+                OEnum _ ->
                     ( userenv, context )
     in
     userenv_context_2
@@ -1072,6 +1150,24 @@ scopePop context =
         context
 
 
+userDefEnumAdd : String -> List String ->  UserEnv -> Context -> ( UserEnv, Context )
+userDefEnumAdd name entrys  (UserEnv userenv) (Context context) =
+    let
+        --log_ =
+        --    context.log ++ "[enum]" ++ name ++ " "
+
+        (Context context_ ) =
+             addEnumDict name entrys (Context context)
+
+    in
+    ( UserEnv
+        userenv
+        
+    , Context
+        { context
+            | enumdic = context_.enumdic
+        }
+    )
 
 --userDefFuncDic = Dict.empty
 
@@ -1139,6 +1235,19 @@ evalStep arr pos userenv context =
                                     "undef"
                     in
                     ( userenv, newConstant name b_ context )
+
+                Just (DefEnum a b ) ->
+                    --let
+                    --    name =
+                    --        case a of
+                    --            Variable n ->
+                    --                n
+
+                    --            _ ->
+                    --                "undef"
+                    --in
+                    --userDefFuncAdd name b c userenv context
+                    userDefEnumAdd a b userenv context
 
                 Just (DefFunc a b c) ->
                     let
@@ -1218,6 +1327,9 @@ evalStep arr pos userenv context =
                                 ODict _ ->
                                     "false"
 
+                                OEnum _ ->
+                                    "false"
+
                         context_1 =
                             scopePush context
 
@@ -1241,6 +1353,9 @@ evalStep arr pos userenv context =
                                     ( userenv, context_1 )
 
                                 ODict _ ->
+                                    ( userenv, context_1 )
+
+                                OEnum _ ->
                                     ( userenv, context_1 )
 
                         context_3 =
@@ -1275,6 +1390,9 @@ evalStep arr pos userenv context =
                                 ODict _ ->
                                     "false"
 
+                                OEnum _ ->
+                                    "false"
+
                         context_1 =
                             scopePush context
 
@@ -1298,6 +1416,9 @@ evalStep arr pos userenv context =
                                     ( userenv, context_1 )
 
                                 ODict _ ->
+                                    ( userenv, context_1 )
+
+                                OEnum _ ->
                                     ( userenv, context_1 )
 
                         context_3 =
@@ -1332,6 +1453,9 @@ evalStep arr pos userenv context =
                                 ODict _ ->
                                     "false"
 
+                                OEnum _ ->
+                                    "false"
+
                         context_1 =
                             scopePush context
 
@@ -1355,6 +1479,9 @@ evalStep arr pos userenv context =
                                     ( userenv, context_1 )
 
                                 ODict _ ->
+                                    ( userenv, context_1 )
+
+                                OEnum _ ->
                                     ( userenv, context_1 )
 
                         context_3 =
@@ -1389,6 +1516,9 @@ evalStep arr pos userenv context =
                                 ODict _ ->
                                     "false"
 
+                                OEnum _ ->
+                                    "false"
+
                         context_1 =
                             scopePush context
 
@@ -1412,6 +1542,9 @@ evalStep arr pos userenv context =
                                     ( userenv, context_1 )
 
                                 ODict _ ->
+                                    ( userenv, context_1 )
+
+                                OEnum _ ->
                                     ( userenv, context_1 )
 
                         context_3 =
@@ -1444,6 +1577,9 @@ evalStep arr pos userenv context =
                                     "false"
 
                                 ODict _ ->
+                                    "false"
+
+                                OEnum _ ->
                                     "false"
 
                         context_1 =
