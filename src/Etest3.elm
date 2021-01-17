@@ -38,9 +38,9 @@ testx mode script_name =
            (Err err)
        Ok stmts ->
            let
-               --context = empty
                context = empty
-                       |> addFunction "strjoin" strjoin
+               --context = empty
+               --        |> addFunction "strjoin" strjoin
                userenv = userenvEmpty
                ans  =
                    eval userenv context stmts

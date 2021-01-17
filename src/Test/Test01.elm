@@ -1,6 +1,8 @@
 module Test.Test01 exposing (script)
 
 script = """
+
+use strjoin;
   
   enum City {
      Tokyo,

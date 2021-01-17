@@ -14,7 +14,8 @@ import Expr exposing (..)
 import Parser exposing (..)
 import Set
 
-
+--import Stdlib exposing (..) 
+import Stdlib exposing (stdlib_dic) 
 
 ---------------------------------------------------------------------
 
@@ -40,6 +41,7 @@ userenvEmpty =
 
 type Statement
     = Var Name
+    | DefUse Name
     | IfThen Expr (List Statement)
     | IfThenElse Expr (List Statement) (List Statement)
     | IfThenElsIfThen Expr (List Statement) (List ( Expr, List Statement ))
@@ -171,6 +173,7 @@ statement : Parser Statement
 statement =
     oneOf
         [ defVarStatement
+        , defUseStatement
         , defEnumStatement
         , defFuncStatement
         , assignStatement
@@ -199,6 +202,20 @@ defVarStatement =
         |. spaces
         --|= typeVar
         |= expression
+        |. spaces
+        |. symbol ";"
+
+defUseStatement : Parser Statement
+defUseStatement =
+    succeed DefUse
+        |. spaces
+        |. keyword "use"
+        |. spaces
+        |= variable
+            { start = Char.isLower
+            , inner = \c -> Char.isAlphaNum c || c == '_'
+            , reserved = Set.fromList [ "use", "if", "then", "else", "elsif", "end", "while", "do", "in", "for", "case", "default", "let", "fn", "return", "break", "continue" ]
+            }
         |. spaces
         |. symbol ";"
 
@@ -1237,17 +1254,21 @@ evalStep arr pos userenv context =
                     in
                     ( userenv, newConstant name b_ context )
 
-                Just (DefEnum a b ) ->
-                    --let
-                    --    name =
-                    --        case a of
-                    --            Variable n ->
-                    --                n
+                Just (DefUse a ) ->
+                    --( userenv, addFunction "strjoin" strjoin context )
+                    --( userenv, addFunction a strjoin context )
+                    let
+                         func = Dict.get a stdlib_dic
+                    in
+                    case func of
+                         Just f_ ->
+                               ( userenv, addFunction a f_ context )
+                         _ ->
+                               ( userenv, context )
+                                      
 
-                    --            _ ->
-                    --                "undef"
-                    --in
-                    --userDefFuncAdd name b c userenv context
+                Just (DefEnum a b ) ->
+
                     userDefEnumAdd a b userenv context
 
                 Just (DefFunc a b c) ->

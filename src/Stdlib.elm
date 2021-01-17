@@ -1,8 +1,17 @@
 module Stdlib exposing (..)
 
 import Array
+import Dict
+
 import Expr exposing (..)
 
+stdlib_dic : Dict.Dict String  (Context -> Input -> OutVal)
+stdlib_dic =
+  Dict.fromList
+    [ ("strjoin", strjoin)
+    , ("Bob"    , strjoin)
+    , ("Chuck"  , strjoin)
+    ]
 
 strjoin : Context -> Input -> OutVal
 strjoin context ar =
