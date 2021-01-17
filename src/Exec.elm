@@ -3,6 +3,7 @@ module Exec exposing
     ( stmt_parse
     , userenvEmpty
     , eval
+    , UserEnv
     )
 
 
